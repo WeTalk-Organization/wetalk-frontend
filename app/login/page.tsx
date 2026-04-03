@@ -3,7 +3,6 @@ export default function LoginPage() {
 
     return (
         <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0a1a]">
-            {/* Card đăng nhập */}
             <main className="relative z-10 mx-4 w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-10 shadow-2xl backdrop-blur-xl">
                 {/* Logo */}
                 <div className="mb-10 text-center">

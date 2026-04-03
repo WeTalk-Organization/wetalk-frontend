@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 
@@ -17,7 +17,7 @@ function CallbackContent() {
             localStorage.setItem("refreshToken", refreshToken);
             router.replace("/");
         }
-    }, [searchParams, router]);
+    }, [searchParams, router, accessToken, refreshToken]);
 
     if (!hasTokens) {
         return (

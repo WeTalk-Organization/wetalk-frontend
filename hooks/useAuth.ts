@@ -10,16 +10,20 @@ export function useAuth() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const token = localStorage.getItem("accessToken");
-        if (!token || isTokenExpired(token)) {
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("refreshToken");
-            router.replace("/login");
+        const checkAuth = async () => {
+            const token = localStorage.getItem("accessToken");
+            console.log(token);
+            if (!token || isTokenExpired(token)) {
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("refreshToken");
+                router.replace("/login");
+                setLoading(false);
+                return;
+            }
+            setUser(decodeToken(token));
             setLoading(false);
-            return;
-        }
-        setUser(decodeToken(token));
-        setLoading(false);
+        };
+        checkAuth();
     }, [router]);
 
     const logout = () => {
