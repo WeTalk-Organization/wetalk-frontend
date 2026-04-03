@@ -17,6 +17,7 @@ export function decodeToken(token: string): User | null {
             email: payload.email,
             firstName: payload.firstName,
             lastName: payload.lastName,
+            avatar: payload.avatar,
         };
     } catch {
         return null;
