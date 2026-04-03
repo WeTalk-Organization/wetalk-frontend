@@ -3,7 +3,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { meetingService } from "@/services/meeting.service";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { MeetingResponse } from "@/types/meeting";
 import { LogOut, MessageSquare, Mic, Video, Copy, Check, VideoOff, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
@@ -22,6 +22,7 @@ export default function MeetingRoom() {
     const { user } = useAuth();
     const { remoteStreams, produceMedia } = useWebRTC(socket, roomId, user?.id);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const videoProducerRef = useRef<any>(null);
 
     const [localVideoEnabled, setLocalVideoEnabled] = useState(false);
     const [localAudioEnabled, setLocalAudioEnabled] = useState(false);
@@ -39,7 +40,8 @@ export default function MeetingRoom() {
                 setLocalStream(stream);
                 setLocalVideoEnabled(true);
                 const videoTrack = stream.getVideoTracks()[0];
-                await produceMedia(videoTrack);
+                const producer = await produceMedia(videoTrack);
+                videoProducerRef.current = producer;
             }
             catch (error) {
                 console.error("Lỗi khi bật camera:", error);
@@ -49,6 +51,15 @@ export default function MeetingRoom() {
             localStream?.getTracks().forEach(track => track.stop());
             setLocalStream(null);
             setLocalVideoEnabled(false);
+
+            if (videoProducerRef.current) {
+                videoProducerRef.current.close();
+                socket?.emit("closeProducer", {
+                    roomId,
+                    producerId: videoProducerRef.current.id
+                });
+                videoProducerRef.current = null;
+            }
         }
     }
 
