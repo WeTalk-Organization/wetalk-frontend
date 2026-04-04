@@ -5,10 +5,13 @@ import { meetingService } from "@/services/meeting.service";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { MeetingResponse } from "@/types/meeting";
-import { LogOut, MessageSquare, Mic, Video, Copy, Check, VideoOff, ChevronLeft, ChevronRight } from "lucide-react";
+import { MessageSquare, Mic, Video, Copy, Check, VideoOff, ChevronLeft, ChevronRight, PhoneOff } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import VideoTile from "@/components/meeting/VideoTile";
+import { Toaster } from "react-hot-toast";
+import { useMeetingParticipants } from "@/hooks/useMeetingParticipan";
+import MeetingEndedModal from "@/components/meeting/MeetingEndedModal";
 export default function MeetingRoom() {
     const params = useParams();
     const router = useRouter();
@@ -17,11 +20,13 @@ export default function MeetingRoom() {
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [isLeaving, setIsLeaving] = useState(false);
+    const [isMeetingEnded, setIsMeetingEnded] = useState(false);
 
     const { socket } = useSocket(roomId);
     const { user } = useAuth();
     const { remoteStreams, produceMedia } = useWebRTC(socket, roomId, user?.id);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const videoProducerRef = useRef<any>(null);
 
     const [localVideoEnabled, setLocalVideoEnabled] = useState(false);
@@ -32,6 +37,8 @@ export default function MeetingRoom() {
     const meetingUrl = typeof window !== "undefined"
         ? `${window.location.origin}/meeting/${meeting?.roomId}`
         : "";
+
+    const { participants } = useMeetingParticipants(socket, meeting?.participants);
 
     const handleToggleVideo = async () => {
         if (!localVideoEnabled) {
@@ -113,6 +120,29 @@ export default function MeetingRoom() {
             });
     }, [roomId]);
 
+    useEffect(() => {
+        if (socket && user && roomId) {
+            socket.emit('join-room', {
+                roomId: roomId,
+                user: {
+                    id: user.id,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    avatar: user.avatar
+                }
+            });
+        }
+    }, [socket, user, roomId]);
+
+    useEffect(() => {
+        if (!socket) return;
+        socket.on('meeting-ended', () => {
+            localStream?.getTracks().forEach(t => t.stop());
+            micStream?.getTracks().forEach(t => t.stop());
+            setIsMeetingEnded(true);
+        });
+        return () => { socket.off('meeting-ended'); };
+    }, [socket, localStream, micStream]);
 
     if (error) {
         return (
@@ -137,7 +167,7 @@ export default function MeetingRoom() {
     }
 
     const currentUserId = user?.id;
-    const remoteParticipants = meeting.participants?.filter(p => p.userId !== currentUserId) ?? [];
+    const remoteParticipants = participants.filter(p => p.userId !== currentUserId);
 
     const allTiles = [
         <VideoTile
@@ -173,6 +203,9 @@ export default function MeetingRoom() {
 
     return (
         <div className="flex min-h-screen flex-col bg-[#0a0a1a] text-white">
+            {isMeetingEnded && (
+                <MeetingEndedModal onGoHome={() => router.push('/')} />
+            )}
             <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
                 <div className="flex items-center gap-3">
                     <h1 className="text-lg font-bold">Phòng họp</h1>
@@ -188,17 +221,9 @@ export default function MeetingRoom() {
                         </button>
                     </div>
                 </div>
-                <button
-                    onClick={handleLeaveMeeting}
-                    disabled={isLeaving}
-                    className="flex items-center gap-2 rounded-xl bg-red-600 px-6 py-2 text-sm font-semibold cursor-pointer hover:bg-red-500 disabled:opacity-50"
-                >
-                    <LogOut className="h-4 w-4" />
-                    {isLeaving ? 'Đang rời phòng...' : 'Rời phòng'}
-                </button>
-
             </header>
 
+            <Toaster position="bottom-left" reverseOrder={false} />
 
             <div className="flex flex-1 items-center justify-center p-6 w-full relative group">
                 {totalPages > 1 && (
@@ -272,6 +297,14 @@ export default function MeetingRoom() {
 
                 <button className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
                     <MessageSquare className="h-5 w-5" />
+                </button>
+
+                <button
+                    onClick={handleLeaveMeeting}
+                    disabled={isLeaving}
+                    className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-red-600 transition-all hover:bg-red-500 disabled:opacity-50"
+                >
+                    <PhoneOff className={`h-5 w-5 ${isLeaving ? 'animate-pulse opacity-50' : ''}`} />
                 </button>
             </div>
 

@@ -24,3 +24,14 @@ export interface VideoTileProps {
     videoEnabled?: boolean;
     stream?: MediaStream | null;
 }
+
+export interface SocketUserPayload {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    avatar?: string;
+}
+export interface UserEventPayload {
+    socketId: string;
+    user: SocketUserPayload;
+}
