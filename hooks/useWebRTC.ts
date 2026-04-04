@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
 import * as mediasoupClient from 'mediasoup-client';
 
+
 export function useWebRTC(socket: Socket | null, roomId: string, userId?: string) {
     const deviceRef = useRef<mediasoupClient.Device | null>(null);
     const sendTransportRef = useRef<mediasoupClient.types.Transport | null>(null);
@@ -206,10 +207,10 @@ export function useWebRTC(socket: Socket | null, roomId: string, userId?: string
                 return newMap;
             });
         });
-
         return () => {
             socket.off('newProducer');
             socket.off('producerClosed');
+
         };
     }, [socket, consumeMedia]);
 
