@@ -2,7 +2,7 @@ export interface Participant {
     userId: string;
     firstName?: string;
     lastName?: string;
-    avatarUrl?: string;
+    avatar?: string;
     videoEnabled: boolean;
     audioEnabled: boolean;
     joinedAt?: string;
@@ -20,9 +20,10 @@ export interface MeetingResponse {
 
 export interface VideoTileProps {
     name: string;
-    avatarUrl?: string;
+    avatar?: string;
     videoEnabled?: boolean;
     stream?: MediaStream | null;
+    isLocal?: boolean;
 }
 
 export interface SocketUserPayload {
