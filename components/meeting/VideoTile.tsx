@@ -2,20 +2,32 @@ import Image from "next/image";
 import VideoPlayer from "@/components/meeting/VideoPlayer";
 import { VideoOff } from "lucide-react";
 import { VideoTileProps } from "@/types/meeting";
+import { useEffect, useRef } from "react";
 
 
-export default function VideoTile({ name, avatarUrl, videoEnabled, stream }: VideoTileProps) {
+export default function VideoTile({ name, avatar, videoEnabled, stream, isLocal }: VideoTileProps) {
     const hasVideo = videoEnabled && stream && stream.getVideoTracks().length > 0;
+    const audioRef = useRef<HTMLAudioElement>(null);
+
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio || !stream || isLocal) return;
+        audio.srcObject = stream;
+        audio.play().catch((err: unknown) => {
+            console.warn('⚠️ Audio autoplay bị block:', err);
+        });
+    }, [stream, isLocal]);
 
     return (
         <div className="relative h-full w-full min-h-[300px] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900">
+            <audio ref={audioRef} autoPlay playsInline className="hidden" />
             {hasVideo ? (
                 <VideoPlayer stream={stream!} />
             ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-zinc-800">
-                    {avatarUrl ? (
+                    {avatar ? (
                         <Image
-                            src={avatarUrl}
+                            src={avatar}
                             alt={name}
                             width={80}
                             height={80}

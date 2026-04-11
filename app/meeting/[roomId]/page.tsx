@@ -5,13 +5,15 @@ import { meetingService } from "@/services/meeting.service";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { MeetingResponse } from "@/types/meeting";
-import { MessageSquare, Mic, Video, Copy, Check, VideoOff, ChevronLeft, ChevronRight, PhoneOff } from "lucide-react";
+import { MessageSquare, Mic, MicOff, Video, Copy, Check, VideoOff, ChevronLeft, ChevronRight, PhoneOff } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import VideoTile from "@/components/meeting/VideoTile";
 import { Toaster } from "react-hot-toast";
 import { useMeetingParticipants } from "@/hooks/useMeetingParticipan";
 import MeetingEndedModal from "@/components/meeting/MeetingEndedModal";
+import * as mediasoupClient from 'mediasoup-client';
+
 export default function MeetingRoom() {
     const params = useParams();
     const router = useRouter();
@@ -24,10 +26,10 @@ export default function MeetingRoom() {
 
     const { socket } = useSocket(roomId);
     const { user } = useAuth();
-    const { remoteStreams, produceMedia } = useWebRTC(socket, roomId, user?.id);
+    const { remoteStreams, produceMedia } = useWebRTC(socket, roomId, user ?? undefined);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const videoProducerRef = useRef<any>(null);
+    const videoProducerRef = useRef<mediasoupClient.types.Producer | null>(null);
+    const audioProducerRef = useRef<mediasoupClient.types.Producer | null>(null);
 
     const [localVideoEnabled, setLocalVideoEnabled] = useState(false);
     const [localAudioEnabled, setLocalAudioEnabled] = useState(false);
@@ -73,15 +75,38 @@ export default function MeetingRoom() {
     const handleToggleMic = async () => {
         if (!localAudioEnabled) {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-                setMicStream(stream);
+                if (!audioProducerRef.current) {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                    setMicStream(stream);
+                    const audioTrack = stream.getAudioTracks()[0];
+                    const producer = await produceMedia(audioTrack);
+                    audioProducerRef.current = producer;
+
+                }
+                else {
+                    if (audioProducerRef.current.track) {
+                        audioProducerRef.current.track.enabled = true;
+                    }
+                    socket?.emit('resumeProducer', {
+                        roomId,
+                        producerId: audioProducerRef.current.id
+                    });
+                }
                 setLocalAudioEnabled(true);
+
             } catch (error) {
                 console.error("Lỗi khi bật mic:", error);
             }
         } else {
-            micStream?.getTracks().forEach(track => track.stop());
-            setMicStream(null);
+            if (audioProducerRef.current) {
+                if (audioProducerRef.current.track) {
+                    audioProducerRef.current.track.enabled = false;
+                }
+                socket?.emit('pauseProducer', {
+                    roomId,
+                    producerId: audioProducerRef.current.id
+                });
+            }
             setLocalAudioEnabled(false);
         }
     }
@@ -111,7 +136,7 @@ export default function MeetingRoom() {
         meetingService
             .join(roomId)
             .then((res) => {
-                console.log(res.data);
+                console.log('partData: ', res.data);
                 setMeeting(res.data);
             })
             .catch((err) => {
@@ -120,19 +145,19 @@ export default function MeetingRoom() {
             });
     }, [roomId]);
 
+
     useEffect(() => {
-        if (socket && user && roomId) {
-            socket.emit('join-room', {
-                roomId: roomId,
-                user: {
-                    id: user.id,
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    avatar: user.avatar
+        const unlockAudio = () => {
+            document.querySelectorAll('audio').forEach(el => {
+                if (el.paused && el.srcObject) {
+                    el.play().catch(() => { });
                 }
             });
-        }
-    }, [socket, user, roomId]);
+            document.removeEventListener('click', unlockAudio);
+        };
+        document.addEventListener('click', unlockAudio);
+        return () => document.removeEventListener('click', unlockAudio);
+    }, []);
 
     useEffect(() => {
         if (!socket) return;
@@ -173,9 +198,10 @@ export default function MeetingRoom() {
         <VideoTile
             key="local-user"
             name={"Bạn"}
-            avatarUrl={user?.avatar}
+            avatar={user?.avatar}
             videoEnabled={localVideoEnabled}
             stream={localStream}
+            isLocal={true}
         />,
 
         ...remoteParticipants.map(p => {
@@ -187,9 +213,10 @@ export default function MeetingRoom() {
                 <VideoTile
                     key={`remote-${p.userId}`}
                     name={`${p.firstName} ${p.lastName}`}
-                    avatarUrl={p.avatarUrl}
+                    avatar={p.avatar}
                     videoEnabled={p.videoEnabled || stream !== null}
                     stream={stream}
+                    isLocal={false}
                 />
             );
         }),
@@ -283,9 +310,9 @@ export default function MeetingRoom() {
             <div className="flex items-center justify-center gap-4 border-t border-white/10 py-4">
                 <button
                     onClick={handleToggleMic}
-                    className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all hover:bg-white/20 ${localAudioEnabled ? "bg-violet-600" : "bg-white/10"}`}
+                    className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all ${localAudioEnabled ? "bg-violet-600 hover:bg-violet-500" : "bg-red-500 hover:bg-red-600"}`}
                 >
-                    {localAudioEnabled ? <Mic className="h-5 w-5" /> : <Mic className="h-5 w-5 opacity-40" />}
+                    {localAudioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5 text-white" />}
                 </button>
 
                 <button

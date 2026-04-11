@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
 import * as mediasoupClient from 'mediasoup-client';
+import { CustomTrack } from '@/types/webRTC';
+import { User } from '@/types/auth';
 
+type ExistingProducer = { producerId: string; socketId: string; userId: string };
 
-export function useWebRTC(socket: Socket | null, roomId: string, userId?: string) {
+export function useWebRTC(socket: Socket | null, roomId: string, user?: User) {
+    const userId = user?.id;
     const deviceRef = useRef<mediasoupClient.Device | null>(null);
     const sendTransportRef = useRef<mediasoupClient.types.Transport | null>(null);
     const recvTransportRef = useRef<mediasoupClient.types.Transport | null>(null);
@@ -120,10 +124,9 @@ export function useWebRTC(socket: Socket | null, roomId: string, userId?: string
         }
     }, [socket, roomId, userId]);
 
-    const produceMedia = useCallback(async (track: MediaStreamTrack) => {
+    const produceMedia = useCallback(async (track: MediaStreamTrack): Promise<mediasoupClient.types.Producer> => {
         if (!sendTransportRef.current) {
-            console.error('Ống dẫn Send chưa sẵn sàng!');
-            return;
+            throw new Error('Ống dẫn Send chưa sẵn sàng!');
         }
 
         console.log(`🎥 Đang đóng gói dòng chảy [${track.kind}] để gửi lên Server...`);
@@ -159,6 +162,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, userId?: string
                     else resolve(res);
                 })
             });
+            console.log('consumeData', consumeData)
 
             const consumer = await recvTransportRef.current.consume({
                 id: consumeData.id,
@@ -167,10 +171,21 @@ export function useWebRTC(socket: Socket | null, roomId: string, userId?: string
                 rtpParameters: consumeData.rtpParameters,
             });
 
-            const stream = new MediaStream([consumer.track]);
+
+            (consumer.track as CustomTrack).producerId = producerId;
+
             setRemoteStreams(prev => {
                 const newMap = new Map(prev);
-                newMap.set(socketId, { stream, socketId, userId: userId });
+                const existingStreamData = newMap.get(socketId);
+                let combinedStream;
+                if (existingStreamData) {
+                    existingStreamData.stream.addTrack(consumer.track);
+                    combinedStream = existingStreamData.stream;
+                }
+                else {
+                    combinedStream = new MediaStream([consumer.track]);
+                }
+                newMap.set(socketId, { stream: combinedStream, socketId, userId: userId });
                 return newMap;
             })
 
@@ -178,7 +193,13 @@ export function useWebRTC(socket: Socket | null, roomId: string, userId?: string
                 console.log(`📴 Stream của [${socketId}] đã kết thúc.`);
                 setRemoteStreams(prev => {
                     const newMap = new Map(prev);
-                    newMap.delete(socketId);
+                    const existing = newMap.get(socketId);
+                    if (existing) {
+                        existing.stream.removeTrack(consumer.track);
+                        if (existing.stream.getTracks().length === 0) {
+                            newMap.delete(socketId);
+                        }
+                    }
                     return newMap;
                 });
             };
@@ -196,31 +217,61 @@ export function useWebRTC(socket: Socket | null, roomId: string, userId?: string
         if (!socket) return;
 
         socket.on('newProducer', ({ producerId, socketId, userId }) => {
-            consumeMedia(producerId, socketId, userId);
+            void consumeMedia(producerId, socketId, userId);
         });
 
-        socket.on('producerClosed', ({ socketId }) => {
+        socket.on('producerClosed', ({ socketId, producerId }) => {
             console.log(`📴 Producer của [${socketId}] đã đóng.`);
             setRemoteStreams(prev => {
                 const newMap = new Map(prev);
-                newMap.delete(socketId);
+                const existing = newMap.get(socketId);
+                if (existing) {
+                    const trackToRemove = existing.stream.getTracks().find((t: MediaStreamTrack) => (t as CustomTrack).producerId === producerId);
+                    if (trackToRemove) {
+                        existing.stream.removeTrack(trackToRemove);
+                    }
+                    if (existing.stream.getTracks().length === 0) {
+                        newMap.delete(socketId);
+                    }
+                }
                 return newMap;
             });
         });
+
         return () => {
             socket.off('newProducer');
             socket.off('producerClosed');
-
         };
     }, [socket, consumeMedia]);
 
     useEffect(() => {
-        if (socket) {
-            initDevice().then(() => {
-                initTransports();
-            });
-        }
-    }, [socket, initDevice, initTransports]);
+        if (!socket || !user) return;
+
+        initDevice()
+            .then(() => initTransports())
+            .then(() => {
+                // ✅ emit join-room SAU KHI transport sẵn sàng
+                socket.emit(
+                    'join-room',
+                    {
+                        roomId,
+                        user: {
+                            id: user.id,
+                            firstName: user.firstName,
+                            lastName: user.lastName,
+                            avatar: user.avatar,
+                        },
+                    },
+                    async (response: { joined: boolean; existingProducers: ExistingProducer[] }) => {
+                        console.log('📋 existingProducers:', response.existingProducers);
+                        for (const { producerId, socketId, userId } of response.existingProducers ?? []) {
+                            await consumeMedia(producerId, socketId, userId);
+                        }
+                    },
+                );
+            })
+            .catch((err) => console.error('❌ Lỗi khởi tạo WebRTC:', err));
+    }, [socket, user, roomId, initDevice, initTransports, consumeMedia]);
 
     return {
         remoteStreams,

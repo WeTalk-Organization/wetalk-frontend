@@ -17,6 +17,7 @@ export function useMeetingParticipants(
 
     useEffect(() => {
         if (initialParticipants) {
+            console.log('initialParticipants: ', initialParticipants);
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setParticipants(initialParticipants);
         }
@@ -39,7 +40,7 @@ export function useMeetingParticipants(
                     userId: user.id,
                     firstName: user.firstName ?? '',
                     lastName: user.lastName ?? '',
-                    avatarUrl: user.avatar,
+                    avatar: user.avatar,
                     videoEnabled: false,
                     audioEnabled: false,
                 };
