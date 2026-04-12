@@ -13,6 +13,7 @@ import { Toaster } from "react-hot-toast";
 import { useMeetingParticipants } from "@/hooks/useMeetingParticipan";
 import MeetingEndedModal from "@/components/meeting/MeetingEndedModal";
 import * as mediasoupClient from 'mediasoup-client';
+import ChatBox from "@/components/chat/ChatBox";
 
 export default function MeetingRoom() {
     const params = useParams();
@@ -23,6 +24,7 @@ export default function MeetingRoom() {
     const [copied, setCopied] = useState(false);
     const [isLeaving, setIsLeaving] = useState(false);
     const [isMeetingEnded, setIsMeetingEnded] = useState(false);
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     const { socket } = useSocket(roomId);
     const { user } = useAuth();
@@ -229,7 +231,7 @@ export default function MeetingRoom() {
     const currentTiles = allTiles.slice(startIndex, startIndex + tilesPerPage);
 
     return (
-        <div className="flex min-h-screen flex-col bg-[#0a0a1a] text-white">
+        <div className="flex h-screen flex-col bg-[#0a0a1a] text-white overflow-hidden">
             {isMeetingEnded && (
                 <MeetingEndedModal onGoHome={() => router.push('/')} />
             )}
@@ -252,56 +254,76 @@ export default function MeetingRoom() {
 
             <Toaster position="bottom-left" reverseOrder={false} />
 
-            <div className="flex flex-1 items-center justify-center p-6 w-full relative group">
-                {totalPages > 1 && (
-                    <button
-                        onClick={() => setCurrentPage(validCurrentPage - 1)}
-                        disabled={validCurrentPage === 1}
-                        className="absolute left-6 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-all hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10 opacity-0 group-hover:opacity-100"
-                    >
-                        <ChevronLeft className="h-6 w-6" />
-                    </button>
-                )}
+            <div className="flex flex-1 min-h-0 items-center justify-center p-6 w-full relative overflow-hidden flex-row">
+                <div className="flex-1 w-full h-full relative group flex items-center justify-center transition-all duration-300">
+                    {totalPages > 1 && (
+                        <button
+                            onClick={() => setCurrentPage(validCurrentPage - 1)}
+                            disabled={validCurrentPage === 1}
+                            className="absolute left-6 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-all hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10 opacity-0 group-hover:opacity-100"
+                        >
+                            <ChevronLeft className="h-6 w-6" />
+                        </button>
+                    )}
 
-                <div
-                    className={`w-[85%] max-w-[1600px] mx-auto h-full min-h-[75vh] gap-4 ${currentTiles.length === 1 ? 'flex items-center justify-center' : 'grid px-10'}`}
-                    style={currentTiles.length === 1 ? {} : {
-                        gridTemplateColumns: `repeat(${Math.ceil(Math.sqrt(currentTiles.length || 1))}, minmax(0, 1fr))`,
-                        gridTemplateRows: `repeat(${Math.ceil(currentTiles.length / Math.ceil(Math.sqrt(currentTiles.length || 1)))}, minmax(0, 1fr))`,
-                    }}
-                >
-                    {currentTiles.length > 0 ? (
-                        currentTiles.length === 1 ? (
-                            <div className="aspect-video w-full max-w-5xl max-h-full relative">
-                                {currentTiles[0]}
+                    <div
+                        className={`w-[85%] max-w-[1600px] mx-auto h-full min-h-[75vh] gap-4 ${currentTiles.length === 1 ? 'flex items-center justify-center' : 'grid px-10'}`}
+                        style={currentTiles.length === 1 ? {} : {
+                            gridTemplateColumns: `repeat(${Math.ceil(Math.sqrt(currentTiles.length || 1))}, minmax(0, 1fr))`,
+                            gridTemplateRows: `repeat(${Math.ceil(currentTiles.length / Math.ceil(Math.sqrt(currentTiles.length || 1)))}, minmax(0, 1fr))`,
+                        }}
+                    >
+                        {currentTiles.length > 0 ? (
+                            currentTiles.length === 1 ? (
+                                <div className="aspect-video w-full max-w-5xl max-h-full relative">
+                                    {currentTiles[0]}
+                                </div>
+                            ) : currentTiles
+                        ) : (
+                            <div className="flex w-full max-w-3xl aspect-video items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                                <p className="text-zinc-500">Chưa có ai trong phòng</p>
                             </div>
-                        ) : currentTiles
-                    ) : (
-                        <div className="flex w-full max-w-3xl aspect-video items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                            <p className="text-zinc-500">Chưa có ai trong phòng</p>
+                        )}
+                    </div>
+
+                    {totalPages > 1 && (
+                        <button
+                            onClick={() => setCurrentPage(validCurrentPage + 1)}
+                            disabled={validCurrentPage === totalPages}
+                            className="absolute right-6 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-all hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10 opacity-0 group-hover:opacity-100"
+                        >
+                            <ChevronRight className="h-6 w-6" />
+                        </button>
+                    )}
+
+                    {totalPages > 1 && (
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {Array.from({ length: totalPages }).map((_, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => setCurrentPage(i + 1)}
+                                    className={`h-2 rounded-full transition-all ${validCurrentPage === i + 1 ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/80"}`}
+                                />
+                            ))}
                         </div>
                     )}
                 </div>
 
-                {totalPages > 1 && (
-                    <button
-                        onClick={() => setCurrentPage(validCurrentPage + 1)}
-                        disabled={validCurrentPage === totalPages}
-                        className="absolute right-6 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-all hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10 opacity-0 group-hover:opacity-100"
-                    >
-                        <ChevronRight className="h-6 w-6" />
-                    </button>
-                )}
 
-                {totalPages > 1 && (
-                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {Array.from({ length: totalPages }).map((_, i) => (
-                            <button
-                                key={i}
-                                onClick={() => setCurrentPage(i + 1)}
-                                className={`h-2 rounded-full transition-all ${validCurrentPage === i + 1 ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/80"}`}
+                {user && (
+                    <div
+                        className={`shrink-0 self-stretch flex overflow-hidden transition-all duration-500 ease-in-out ${isChatOpen
+                            ? "ml-6 w-[350px] opacity-100 translate-x-0"
+                            : "ml-0 w-0 opacity-0 translate-x-10 pointer-events-none"
+                            }`}
+                    >
+                        <div className="w-[350px] min-w-[350px] h-full shrink-0 py-4">
+                            <ChatBox
+                                socket={socket}
+                                roomId={roomId}
+                                currentUser={user}
                             />
-                        ))}
+                        </div>
                     </div>
                 )}
             </div>
@@ -310,28 +332,43 @@ export default function MeetingRoom() {
             <div className="flex items-center justify-center gap-4 border-t border-white/10 py-4">
                 <button
                     onClick={handleToggleMic}
-                    className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all ${localAudioEnabled ? "bg-violet-600 hover:bg-violet-500" : "bg-red-500 hover:bg-red-600"}`}
+                    className={`group relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all ${localAudioEnabled ? "bg-violet-600 hover:bg-violet-500" : "bg-red-500 hover:bg-red-600"}`}
                 >
                     {localAudioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5 text-white" />}
+                    <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
+                        {localAudioEnabled ? "Tắt micro" : "Bật micro"}
+                    </span>
                 </button>
 
                 <button
                     onClick={handleToggleVideo}
-                    className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all ${localVideoEnabled ? "bg-violet-600 hover:bg-violet-500" : "bg-red-500 hover:bg-red-600"}`}
+                    className={`group relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all ${localVideoEnabled ? "bg-violet-600 hover:bg-violet-500" : "bg-red-500 hover:bg-red-600"}`}
                 >
                     {localVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5 text-white" />}
+                    <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
+                        {localVideoEnabled ? "Tắt camera" : "Bật camera"}
+                    </span>
                 </button>
 
-                <button className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
+                <button
+                    onClick={() => setIsChatOpen(!isChatOpen)}
+                    className={`group relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all ${isChatOpen ? "bg-violet-600 hover:bg-violet-500" : "bg-white/10 hover:bg-white/20"}`}
+                >
                     <MessageSquare className="h-5 w-5" />
+                    <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
+                        {isChatOpen ? "Đóng chat" : "Mở chat"}
+                    </span>
                 </button>
 
                 <button
                     onClick={handleLeaveMeeting}
                     disabled={isLeaving}
-                    className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-red-600 transition-all hover:bg-red-500 disabled:opacity-50"
+                    className="group relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-red-600 transition-all hover:bg-red-500 disabled:opacity-50"
                 >
                     <PhoneOff className={`h-5 w-5 ${isLeaving ? 'animate-pulse opacity-50' : ''}`} />
+                    <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-red-600/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-red-500/30 shadow-[0_0_15px_rgba(220,38,38,0.3)] backdrop-blur-md z-50">
+                        Rời phòng
+                    </span>
                 </button>
             </div>
 
