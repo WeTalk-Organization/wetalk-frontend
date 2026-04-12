@@ -13,6 +13,9 @@ import { Toaster } from "react-hot-toast";
 import { useMeetingParticipants } from "@/hooks/useMeetingParticipan";
 import MeetingEndedModal from "@/components/meeting/MeetingEndedModal";
 import * as mediasoupClient from 'mediasoup-client';
+import ReactionLayer from "@/components/reaction/ReactionLayer";
+import { Smile } from "lucide-react";
+
 import ChatBox from "@/components/chat/ChatBox";
 
 export default function MeetingRoom() {
@@ -37,6 +40,8 @@ export default function MeetingRoom() {
     const [localAudioEnabled, setLocalAudioEnabled] = useState(false);
     const [micStream, setMicStream] = useState<MediaStream | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [isReactionMenuOpen, setIsReactionMenuOpen] = useState(false);
+    const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉', '🔥'];
 
     const meetingUrl = typeof window !== "undefined"
         ? `${window.location.origin}/meeting/${meeting?.roomId}`
@@ -131,6 +136,12 @@ export default function MeetingRoom() {
             setIsLeaving(false);
             router.push("/");
         }
+    };
+
+    const handleSendReaction = (emoji: string) => {
+        if (!socket) return;
+        socket.emit('send-reaction', { roomId, reaction: emoji });
+        setIsReactionMenuOpen(false);
     };
 
     useEffect(() => {
@@ -254,6 +265,8 @@ export default function MeetingRoom() {
 
             <Toaster position="bottom-left" reverseOrder={false} />
 
+            <ReactionLayer socket={socket} currentUserId={user?.id} />
+
             <div className="flex flex-1 min-h-0 items-center justify-center p-6 w-full relative overflow-hidden flex-row">
                 <div className="flex-1 w-full h-full relative group flex items-center justify-center transition-all duration-300">
                     {totalPages > 1 && (
@@ -359,6 +372,32 @@ export default function MeetingRoom() {
                         {isChatOpen ? "Đóng chat" : "Mở chat"}
                     </span>
                 </button>
+
+                <div className="relative group/emoji">
+                    <button
+                        onClick={() => setIsReactionMenuOpen(!isReactionMenuOpen)}
+                        className={`relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all ${isReactionMenuOpen ? "bg-violet-600" : "bg-white/10 hover:bg-white/20"}`}
+                    >
+                        <Smile className="h-5 w-5 text-white" />
+
+                        {/* Tooltip chữ Mở cảm xúc */}
+                        <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover/emoji:opacity-100 group-hover/emoji:scale-100 whitespace-nowrap pointer-events-none shadow-lg z-50">
+                            Cảm xúc
+                        </span>
+                    </button>
+                    {/* Bảng tuỳ chọn Emoji nổi lên khi ấn vào */}
+                    <div className={`absolute bottom-[130%] left-1/2 -translate-x-1/2 flex gap-2 rounded-2xl bg-[#2B2D36] border border-white/10 p-2 shadow-xl backdrop-blur-md z-50 transition-all duration-200 ${isReactionMenuOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-2 pointer-events-none'}`}>
+                        {EMOJIS.map((emoji) => (
+                            <button
+                                key={emoji}
+                                onClick={() => handleSendReaction(emoji)}
+                                className="flex h-10 w-10 items-center justify-center rounded-full text-2xl hover:bg-white/10 hover:scale-125 transition-transform cursor-pointer"
+                            >
+                                {emoji}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
                 <button
                     onClick={handleLeaveMeeting}

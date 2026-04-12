@@ -9,3 +9,9 @@ export type ChatMessage = {
     message: string;
     timestamp: string;
 };
+export interface SocketUser {
+    id: string;
+    firstName: string;
+    lastName: string;
+    avatar?: string;
+}
