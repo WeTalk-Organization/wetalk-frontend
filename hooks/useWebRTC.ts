@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
 import * as mediasoupClient from 'mediasoup-client';
-import { CustomTrack } from '@/types/webRTC';
+import { ChatMessage, CustomTrack } from '@/types/webRTC';
 import { User } from '@/types/auth';
 
 type ExistingProducer = { producerId: string; socketId: string; userId: string };
@@ -213,6 +213,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, user?: User) {
         }
     }, [socket, roomId]);
 
+
     useEffect(() => {
         if (!socket) return;
 
@@ -243,6 +244,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, user?: User) {
             socket.off('producerClosed');
         };
     }, [socket, consumeMedia]);
+
 
     useEffect(() => {
         if (!socket || !user) return;

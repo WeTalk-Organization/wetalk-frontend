@@ -2,13 +2,11 @@ import Image from "next/image";
 import VideoPlayer from "@/components/meeting/VideoPlayer";
 import { VideoOff } from "lucide-react";
 import { VideoTileProps } from "@/types/meeting";
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 
-
-export default function VideoTile({ name, avatar, videoEnabled, stream, isLocal }: VideoTileProps) {
+function VideoTile({ name, avatar, videoEnabled, stream, isLocal }: VideoTileProps) {
     const hasVideo = videoEnabled && stream && stream.getVideoTracks().length > 0;
     const audioRef = useRef<HTMLAudioElement>(null);
-
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio || !stream || isLocal) return;
@@ -50,3 +48,4 @@ export default function VideoTile({ name, avatar, videoEnabled, stream, isLocal 
         </div>
     );
 }
+export default React.memo(VideoTile);
