@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Socket } from 'socket.io-client';
-import type { Participant, UserEventPayload } from '@/types/meeting';
+import type { Participant, UserEventPayload } from '@/types/room';
 import toast from 'react-hot-toast';
 
 // Khớp với SocketUser interface bên backend
 
 
 
-export function useMeetingParticipants(
+export function useRoomParticipants(
     socket: Socket | null,
     initialParticipants: Participant[] | undefined,
 ) {

@@ -4,7 +4,7 @@ export const API_ENDPOINTS = {
         REFRESH: "/auth/refresh",
         PROFILE: "/auth/profile",
     },
-    MEETING: {
-        BASE: "/meeting",
+    ROOM: {
+        BASE: "/room",
     },
 };

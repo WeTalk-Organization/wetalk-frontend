@@ -8,7 +8,7 @@ export interface Participant {
     joinedAt?: string;
 }
 
-export interface MeetingResponse {
+export interface RoomResponse {
     id: string;
     roomId: string;
     hostId: string;

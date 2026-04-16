@@ -1,20 +1,20 @@
 "use client"
 import Header from "@/components/common/Header";
 import { useAuth } from "@/hooks/useAuth";
-import { meetingService } from "@/services/meeting.service";
+import { roomService } from "@/services/room.service";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
   const { loading } = useAuth();
   const router = useRouter();
 
-  const handleCreateMeeting = async () => {
+  const handleCreateRoom = async () => {
     try {
-      const res = await meetingService.create();
-      const { roomId } = res.data;
-      router.push(`/meeting/${roomId}`);
+      const res = await roomService.create();
+      const roomId = res.data.roomId;
+      router.push(`/room/${roomId}`);
     } catch (error) {
-      console.error("Tạo meeting thất bại:", error);
+      console.error("Tạo phòng thất bại:", error);
     }
   };
 
@@ -30,12 +30,14 @@ export default function Home() {
     <div className="min-h-screen bg-[#0a0a1a] text-white">
       <Header />
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <h1 className="text-3xl font-bold">Chào mừng đến Meetiva</h1>
-        <p className="text-lg text-zinc-400">Nền tảng họp trực tuyến thông minh</p>
+        <div className="mb-10">
+          <h1 className="text-3xl font-bold mb-2">Welcome to WeTalk</h1>
+          <p className="text-lg text-gray-300">Learn Languages by Talking</p>
+        </div>
         <button
-          onClick={handleCreateMeeting}
+          onClick={handleCreateRoom}
           className="mt-4 cursor-pointer rounded-xl bg-violet-600 px-8 py-3 text-sm font-semibold transition-all hover:bg-violet-500 active:scale-95">
-          Tạo phòng họp mới
+          Tạo phòng trò chuyện mới
         </button>
       </div>
     </div>

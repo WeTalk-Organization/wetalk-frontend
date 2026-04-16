@@ -1,7 +1,7 @@
 import Image from "next/image";
-import VideoPlayer from "@/components/meeting/VideoPlayer";
+import VideoPlayer from "@/components/room/VideoPlayer";
 import { VideoOff } from "lucide-react";
-import { VideoTileProps } from "@/types/meeting";
+import { VideoTileProps } from "@/types/room";
 import React, { useEffect, useRef } from "react";
 
 function VideoTile({ name, avatar, videoEnabled, stream, isLocal }: VideoTileProps) {
