@@ -6,8 +6,8 @@ export default function LoginPage() {
             <main className="relative z-10 mx-4 w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-10 shadow-2xl backdrop-blur-xl">
                 {/* Logo */}
                 <div className="mb-10 text-center">
-                    <h1 className="text-3xl font-bold tracking-tight text-white">Meetiva</h1>
-                    <p className="mt-2 text-sm text-zinc-400">Nền tảng họp trực tuyến thông minh</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-white">WeTalk</h1>
+                    <p className="mt-2 text-sm text-zinc-400">Learn Languages by Talking</p>
                 </div>
 
                 <a

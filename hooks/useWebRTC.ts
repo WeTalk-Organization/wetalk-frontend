@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
 import * as mediasoupClient from 'mediasoup-client';
-import { ChatMessage, CustomTrack } from '@/types/webRTC';
+import { CustomTrack } from '@/types/webRTC';
 import { User } from '@/types/auth';
 
 type ExistingProducer = { producerId: string; socketId: string; userId: string };
@@ -179,8 +179,8 @@ export function useWebRTC(socket: Socket | null, roomId: string, user?: User) {
                 const existingStreamData = newMap.get(socketId);
                 let combinedStream;
                 if (existingStreamData) {
-                    existingStreamData.stream.addTrack(consumer.track);
-                    combinedStream = existingStreamData.stream;
+                    const existingTracks = existingStreamData.stream.getTracks();
+                    combinedStream = new MediaStream([...existingTracks, consumer.track]);
                 }
                 else {
                     combinedStream = new MediaStream([consumer.track]);
@@ -227,12 +227,17 @@ export function useWebRTC(socket: Socket | null, roomId: string, user?: User) {
                 const newMap = new Map(prev);
                 const existing = newMap.get(socketId);
                 if (existing) {
-                    const trackToRemove = existing.stream.getTracks().find((t: MediaStreamTrack) => (t as CustomTrack).producerId === producerId);
-                    if (trackToRemove) {
-                        existing.stream.removeTrack(trackToRemove);
-                    }
-                    if (existing.stream.getTracks().length === 0) {
+                    const remainingTracks = existing.stream.getTracks().filter(
+                        (t: MediaStreamTrack) => (t as CustomTrack).producerId !== producerId
+                    );
+                    if (remainingTracks.length === 0) {
                         newMap.delete(socketId);
+                    }
+                    else {
+                        newMap.set(socketId, {
+                            ...existing,
+                            stream: new MediaStream(remainingTracks)
+                        });
                     }
                 }
                 return newMap;

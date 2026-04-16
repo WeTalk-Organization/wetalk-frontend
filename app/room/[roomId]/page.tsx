@@ -1,33 +1,34 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
-import { meetingService } from "@/services/meeting.service";
+import { roomService } from "@/services/room.service";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import type { MeetingResponse } from "@/types/meeting";
+import type { RoomResponse } from "@/types/room";
 import { MessageSquare, Mic, MicOff, Video, Copy, Check, VideoOff, ChevronLeft, ChevronRight, PhoneOff } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { useWebRTC } from "@/hooks/useWebRTC";
-import VideoTile from "@/components/meeting/VideoTile";
+import VideoTile from "@/components/room/VideoTile";
 import { Toaster } from "react-hot-toast";
-import { useMeetingParticipants } from "@/hooks/useMeetingParticipan";
-import MeetingEndedModal from "@/components/meeting/MeetingEndedModal";
+import { useRoomParticipants } from "@/hooks/useRoomParticipants";
+import RoomEndedModal from "@/components/room/RoomEndedModal";
 import * as mediasoupClient from 'mediasoup-client';
 import ReactionLayer from "@/components/reaction/ReactionLayer";
 import { Smile } from "lucide-react";
 
 import ChatBox from "@/components/chat/ChatBox";
 
-export default function MeetingRoom() {
+export default function RoomPage() {
     const params = useParams();
     const router = useRouter();
     const roomId = params.roomId as string;
-    const [meeting, setMeeting] = useState<MeetingResponse | null>(null);
+    const [room, setRoom] = useState<RoomResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [isLeaving, setIsLeaving] = useState(false);
-    const [isMeetingEnded, setIsMeetingEnded] = useState(false);
+    const [isRoomEnded, setIsRoomEnded] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
 
     const { socket } = useSocket(roomId);
     const { user } = useAuth();
@@ -43,21 +44,21 @@ export default function MeetingRoom() {
     const [isReactionMenuOpen, setIsReactionMenuOpen] = useState(false);
     const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉', '🔥'];
 
-    const meetingUrl = typeof window !== "undefined"
-        ? `${window.location.origin}/meeting/${meeting?.roomId}`
+    const roomUrl = typeof window !== "undefined"
+        ? `${window.location.origin}/room/${room?.roomId}`
         : "";
 
-    const { participants } = useMeetingParticipants(socket, meeting?.participants);
+    const { participants } = useRoomParticipants(socket, room?.participants);
 
     const handleToggleVideo = async () => {
         if (!localVideoEnabled) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-                setLocalStream(stream);
-                setLocalVideoEnabled(true);
                 const videoTrack = stream.getVideoTracks()[0];
                 const producer = await produceMedia(videoTrack);
                 videoProducerRef.current = producer;
+                setLocalStream(stream);
+                setLocalVideoEnabled(true);
             }
             catch (error) {
                 console.error("Lỗi khi bật camera:", error);
@@ -119,23 +120,30 @@ export default function MeetingRoom() {
     }
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(meetingUrl);
+        navigator.clipboard.writeText(roomUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleLeaveMeeting = async () => {
+    const handleLeaveRoom = async () => {
         try {
             setIsLeaving(true);
             localStream?.getTracks().forEach(t => t.stop());
             micStream?.getTracks().forEach(t => t.stop());
-            await meetingService.leave(roomId);
+            await roomService.leave(roomId);
         } catch (error) {
             console.error("Lỗi khi rời phòng:", error);
         } finally {
             setIsLeaving(false);
             router.push("/");
         }
+    };
+
+    const handleToggleChat = () => {
+        if (!isChatOpen) {
+            setUnreadCount(0);
+        }
+        setIsChatOpen(prev => !prev);
     };
 
     const handleSendReaction = (emoji: string) => {
@@ -146,15 +154,15 @@ export default function MeetingRoom() {
 
     useEffect(() => {
         if (!roomId) return;
-        meetingService
+        roomService
             .join(roomId)
             .then((res) => {
                 console.log('partData: ', res.data);
-                setMeeting(res.data);
+                setRoom(res.data);
             })
             .catch((err) => {
                 console.error("Lỗi khi tham gia phòng:", err);
-                setError("Phòng họp không tồn tại, đã kết thúc hoặc bạn không có quyền.");
+                setError("Phòng học không tồn tại, đã kết thúc hoặc bạn không có quyền.");
             });
     }, [roomId]);
 
@@ -174,12 +182,23 @@ export default function MeetingRoom() {
 
     useEffect(() => {
         if (!socket) return;
-        socket.on('meeting-ended', () => {
+        const handleNewMessage = () => {
+            if (!isChatOpen) {
+                setUnreadCount(prev => prev + 1);
+            }
+        };
+        socket.on('receive-chat-message', handleNewMessage);
+        return () => { socket.off('receive-chat-message', handleNewMessage); };
+    }, [socket, isChatOpen]);
+
+    useEffect(() => {
+        if (!socket) return;
+        socket.on('room-ended', () => {
             localStream?.getTracks().forEach(t => t.stop());
             micStream?.getTracks().forEach(t => t.stop());
-            setIsMeetingEnded(true);
+            setIsRoomEnded(true);
         });
-        return () => { socket.off('meeting-ended'); };
+        return () => { socket.off('room-ended'); };
     }, [socket, localStream, micStream]);
 
     if (error) {
@@ -196,10 +215,10 @@ export default function MeetingRoom() {
         );
     }
 
-    if (!meeting) {
+    if (!room) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#0a0a1a] text-white">
-                <p>Đang tải phòng họp...</p>
+                <p>Đang tải phòng học...</p>
             </div>
         );
     }
@@ -243,15 +262,15 @@ export default function MeetingRoom() {
 
     return (
         <div className="flex h-screen flex-col bg-[#0a0a1a] text-white overflow-hidden">
-            {isMeetingEnded && (
-                <MeetingEndedModal onGoHome={() => router.push('/')} />
+            {isRoomEnded && (
+                <RoomEndedModal onGoHome={() => router.push('/')} />
             )}
             <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-lg font-bold">Phòng họp</h1>
+                    <h1 className="text-lg font-bold">WeTalk</h1>
                     <div className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5">
                         <span className="text-sm text-zinc-400 max-w-[300px] truncate">
-                            {meetingUrl}
+                            {roomUrl}
                         </span>
                         <button
                             onClick={handleCopy}
@@ -364,10 +383,15 @@ export default function MeetingRoom() {
                 </button>
 
                 <button
-                    onClick={() => setIsChatOpen(!isChatOpen)}
+                    onClick={handleToggleChat}
                     className={`group relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all ${isChatOpen ? "bg-violet-600 hover:bg-violet-500" : "bg-white/10 hover:bg-white/20"}`}
                 >
                     <MessageSquare className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-5 min-w-5 px-1 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg animate-in zoom-in-50 duration-200">
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                    )}
                     <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
                         {isChatOpen ? "Đóng chat" : "Mở chat"}
                     </span>
@@ -400,7 +424,7 @@ export default function MeetingRoom() {
                 </div>
 
                 <button
-                    onClick={handleLeaveMeeting}
+                    onClick={handleLeaveRoom}
                     disabled={isLeaving}
                     className="group relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-red-600 transition-all hover:bg-red-500 disabled:opacity-50"
                 >
@@ -414,3 +438,4 @@ export default function MeetingRoom() {
         </div>
     );
 }
+
