@@ -3,15 +3,18 @@ import { ChatMessage } from '@/types/webRTC';
 import { User } from '@/types/auth';
 import EmojiPicker, { Theme, EmojiClickData } from 'emoji-picker-react';
 import { Socket } from 'socket.io-client';
+import { X } from 'lucide-react';
 
 interface ChatBoxProps {
     socket: Socket | null;
-    roomId: string; // Thêm roomId 
+    roomId: string;
     currentUser: User | undefined;
+    isOpen: boolean;
+    onClose: () => void;
 }
 
 
-const ChatBox: React.FC<ChatBoxProps> = ({ socket, roomId, currentUser }) => {
+const ChatBox: React.FC<ChatBoxProps> = ({ socket, roomId, currentUser, isOpen, onClose }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -82,11 +85,16 @@ const ChatBox: React.FC<ChatBoxProps> = ({ socket, roomId, currentUser }) => {
     };
 
     return (
-        <div className="flex flex-col h-full w-[350px] bg-[#1A1D24] rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.4)] overflow-hidden font-sans border border-white/10">
+        <div className={`flex flex-col h-full w-[350px] bg-[#1A1D24] rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.4)] overflow-hidden font-sans border border-white/10 ${isOpen ? '' : 'hidden'}`}>
             {/* Header */}
-            <div className="px-5 py-4 bg-[#2B2D36]/80 backdrop-blur-md border-b border-white/5 flex items-center gap-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
-                <h3 className="font-semibold text-white text-base m-0 tracking-wide">Chat</h3>
+            <div className="px-5 py-4 bg-[#2B2D36]/80 backdrop-blur-md border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                    <h3 className="font-semibold text-white text-base m-0 tracking-wide">Chat</h3>
+                </div>
+                <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors cursor-pointer">
+                    <X className="w-5 h-5" />
+                </button>
             </div>
 
             {/* Message List */}
@@ -115,12 +123,15 @@ const ChatBox: React.FC<ChatBoxProps> = ({ socket, roomId, currentUser }) => {
                             {/* Avatar */}
                             {!isMine && (
                                 msg.sender.avatar ? (
-                                    <img
-                                        src={msg.sender.avatar}
-                                        alt="avatar"
-                                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 shadow-sm border border-white/10"
-                                        referrerPolicy="no-referrer"
-                                    />
+                                    <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={msg.sender.avatar}
+                                            alt="avatar"
+                                            className="w-9 h-9 rounded-full object-cover flex-shrink-0 shadow-sm border border-white/10"
+                                            referrerPolicy="no-referrer"
+                                        />
+                                    </>
                                 ) : (
                                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#00C6FF] to-[#0072FF] flex items-center justify-center text-white text-[13px] font-bold flex-shrink-0 shadow-sm border border-white/10">
                                         {firstLetter}

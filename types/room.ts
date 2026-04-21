@@ -24,6 +24,7 @@ export interface VideoTileProps {
     videoEnabled?: boolean;
     stream?: MediaStream | null;
     isLocal?: boolean;
+    isSpeaking?: boolean;
 }
 
 export interface SocketUserPayload {

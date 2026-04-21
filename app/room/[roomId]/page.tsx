@@ -5,16 +5,20 @@ import { roomService } from "@/services/room.service";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { RoomResponse } from "@/types/room";
-import { MessageSquare, Mic, MicOff, Video, Copy, Check, VideoOff, ChevronLeft, ChevronRight, PhoneOff } from "lucide-react";
+import { MessageSquare, Mic, MicOff, Video, Copy, Check, VideoOff, ChevronLeft, ChevronRight, PhoneOff, Users } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import VideoTile from "@/components/room/VideoTile";
 import { Toaster } from "react-hot-toast";
 import { useRoomParticipants } from "@/hooks/useRoomParticipants";
 import RoomEndedModal from "@/components/room/RoomEndedModal";
+import KickedModal from "@/components/room/KickedModal";
+import ConfirmKickModal from "@/components/room/ConfirmKickModal";
+import ParticipantList from "@/components/room/ParticipantList";
 import * as mediasoupClient from 'mediasoup-client';
 import ReactionLayer from "@/components/reaction/ReactionLayer";
 import { Smile } from "lucide-react";
+import { useSpeakingDetection } from "@/hooks/useSpeakingDetection";
 
 import ChatBox from "@/components/chat/ChatBox";
 
@@ -27,8 +31,14 @@ export default function RoomPage() {
     const [copied, setCopied] = useState(false);
     const [isLeaving, setIsLeaving] = useState(false);
     const [isRoomEnded, setIsRoomEnded] = useState(false);
+    const [isKicked, setIsKicked] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
+    const [isParticipantOpen, setIsParticipantOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+
+    const [kickTarget, setKickTarget] = useState<{ userId: string; name: string } | null>(null);
+    const [kickStatus, setKickStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+    const [kickError, setKickError] = useState<string>('');
 
     const { socket } = useSocket(roomId);
     const { user } = useAuth();
@@ -49,6 +59,12 @@ export default function RoomPage() {
         : "";
 
     const { participants } = useRoomParticipants(socket, room?.participants);
+    const speakingUsers = useSpeakingDetection({
+        localStream: micStream,
+        localAudioEnabled,
+        currentUserId: user?.id,
+        remoteStreams,
+    });
 
     const handleToggleVideo = async () => {
         if (!localVideoEnabled) {
@@ -139,9 +155,17 @@ export default function RoomPage() {
         }
     };
 
+    const handleToggleParticipant = () => {
+        if (!isParticipantOpen) {
+            setIsChatOpen(false);
+        }
+        setIsParticipantOpen(prev => !prev);
+    };
+
     const handleToggleChat = () => {
         if (!isChatOpen) {
             setUnreadCount(0);
+            setIsParticipantOpen(false);
         }
         setIsChatOpen(prev => !prev);
     };
@@ -150,6 +174,29 @@ export default function RoomPage() {
         if (!socket) return;
         socket.emit('send-reaction', { roomId, reaction: emoji });
         setIsReactionMenuOpen(false);
+    };
+
+    const initKickParticipant = (targetUserId: string, targetName: string) => {
+        setKickTarget({ userId: targetUserId, name: targetName });
+        setKickStatus('idle');
+    };
+
+    const confirmKickParticipant = async () => {
+        if (!kickTarget) return;
+        setKickStatus('loading');
+        try {
+            await roomService.kick(roomId, kickTarget.userId);
+            setKickStatus('success');
+        } catch (error) {
+            const err = error as { response?: { data?: { message?: string } } };
+            console.error("Lỗi khi đuổi người dùng:", error);
+            setKickError(err.response?.data?.message || 'Không thể mời người dùng này ra khỏi phòng');
+            setKickStatus('error');
+        }
+    };
+
+    const handleCloseKickModal = () => {
+        setKickTarget(null);
     };
 
     useEffect(() => {
@@ -198,8 +245,18 @@ export default function RoomPage() {
             micStream?.getTracks().forEach(t => t.stop());
             setIsRoomEnded(true);
         });
-        return () => { socket.off('room-ended'); };
-    }, [socket, localStream, micStream]);
+
+        socket.on('you-were-kicked', () => {
+            localStream?.getTracks().forEach(t => t.stop());
+            micStream?.getTracks().forEach(t => t.stop());
+            setIsKicked(true);
+        });
+
+        return () => {
+            socket.off('room-ended');
+            socket.off('you-were-kicked');
+        };
+    }, [socket, localStream, micStream, router]);
 
     if (error) {
         return (
@@ -249,6 +306,7 @@ export default function RoomPage() {
                     videoEnabled={p.videoEnabled || stream !== null}
                     stream={stream}
                     isLocal={false}
+                    isSpeaking={speakingUsers.has(p.userId)}
                 />
             );
         }),
@@ -262,8 +320,20 @@ export default function RoomPage() {
 
     return (
         <div className="flex h-screen flex-col bg-[#0a0a1a] text-white overflow-hidden">
-            {isRoomEnded && (
+            {isRoomEnded && !isKicked && (
                 <RoomEndedModal onGoHome={() => router.push('/')} />
+            )}
+            {isKicked && (
+                <KickedModal onGoHome={() => router.push('/')} />
+            )}
+            {kickTarget && (
+                <ConfirmKickModal
+                    targetName={kickTarget.name}
+                    status={kickStatus}
+                    errorMessage={kickError}
+                    onConfirm={confirmKickParticipant}
+                    onCancel={handleCloseKickModal}
+                />
             )}
             <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
                 <div className="flex items-center gap-3">
@@ -344,7 +414,7 @@ export default function RoomPage() {
 
                 {user && (
                     <div
-                        className={`shrink-0 self-stretch flex overflow-hidden transition-all duration-500 ease-in-out ${isChatOpen
+                        className={`shrink-0 self-stretch flex overflow-hidden transition-all duration-500 ease-in-out ${(isChatOpen || isParticipantOpen)
                             ? "ml-6 w-[350px] opacity-100 translate-x-0"
                             : "ml-0 w-0 opacity-0 translate-x-10 pointer-events-none"
                             }`}
@@ -354,7 +424,18 @@ export default function RoomPage() {
                                 socket={socket}
                                 roomId={roomId}
                                 currentUser={user}
+                                isOpen={isChatOpen}
+                                onClose={() => setIsChatOpen(false)}
                             />
+                            {isParticipantOpen && (
+                                <ParticipantList
+                                    participants={participants}
+                                    currentUserId={user.id}
+                                    hostId={room?.hostId}
+                                    onClose={() => setIsParticipantOpen(false)}
+                                    onKick={initKickParticipant}
+                                />
+                            )}
                         </div>
                     </div>
                 )}
@@ -394,6 +475,16 @@ export default function RoomPage() {
                     )}
                     <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
                         {isChatOpen ? "Đóng chat" : "Mở chat"}
+                    </span>
+                </button>
+
+                <button
+                    onClick={handleToggleParticipant}
+                    className={`group relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all ${isParticipantOpen ? "bg-violet-600 hover:bg-violet-500" : "bg-white/10 hover:bg-white/20"}`}
+                >
+                    <Users className="h-5 w-5 " />
+                    <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
+                        {isParticipantOpen ? "Đóng danh sách" : "Mở danh sách"}
                     </span>
                 </button>
 
