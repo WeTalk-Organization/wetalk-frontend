@@ -3,25 +3,17 @@ import { Socket } from 'socket.io-client';
 import type { Participant, UserEventPayload } from '@/types/room';
 import toast from 'react-hot-toast';
 
-// Khớp với SocketUser interface bên backend
-
-
-
 export function useRoomParticipants(
     socket: Socket | null,
     initialParticipants: Participant[] | undefined,
 ) {
-    const [participants, setParticipants] = useState<Participant[]>(
-        initialParticipants ?? [],
-    );
+    const [participants, setParticipants] = useState<Participant[]>(initialParticipants ?? []);
+    const [prevInitial, setPrevInitial] = useState(initialParticipants);
 
-    useEffect(() => {
-        if (initialParticipants) {
-            console.log('initialParticipants: ', initialParticipants);
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setParticipants(initialParticipants);
-        }
-    }, [initialParticipants]);
+    if (initialParticipants !== prevInitial) {
+        setPrevInitial(initialParticipants);
+        setParticipants(initialParticipants ?? []);
+    }
 
     useEffect(() => {
         if (!socket) return;
@@ -57,12 +49,18 @@ export function useRoomParticipants(
             setParticipants(prev => prev.filter(p => p.userId !== user.id));
         };
 
+        const handleParticipantKicked = ({ userId }: { userId: string }) => {
+            setParticipants(prev => prev.filter(p => p.userId !== userId));
+        };
+
         socket.on('user-joined', handleUserJoined);
         socket.on('user-left', handleUserLeft);
+        socket.on('participant-kicked', handleParticipantKicked);
 
         return () => {
             socket.off('user-joined', handleUserJoined);
             socket.off('user-left', handleUserLeft);
+            socket.off('participant-kicked', handleParticipantKicked);
         };
     }, [socket]);
 

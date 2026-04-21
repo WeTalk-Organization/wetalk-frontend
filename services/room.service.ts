@@ -10,4 +10,6 @@ export const roomService = {
         api.post<RoomResponse>(`${API_ENDPOINTS.ROOM.BASE}/${roomId}/join`),
     leave: (roomId: string) =>
         api.post<{ message: string }>(`${API_ENDPOINTS.ROOM.BASE}/${roomId}/leave`),
+    kick: (roomId: string, targetUserId: string) =>
+        api.post<{ kicked: boolean }>(`${API_ENDPOINTS.ROOM.BASE}/${roomId}/kick/${targetUserId}`),
 };
