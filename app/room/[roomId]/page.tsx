@@ -5,7 +5,7 @@ import { roomService } from "@/services/room.service";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { RoomResponse } from "@/types/room";
-import { MessageSquare, Mic, MicOff, Video, Copy, Check, VideoOff, ChevronLeft, ChevronRight, PhoneOff, Users } from "lucide-react";
+import { MessageSquare, Mic, MicOff, Video, Copy, Check, VideoOff, ChevronLeft, ChevronRight, PhoneOff, Users, Captions } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import VideoTile from "@/components/room/VideoTile";
@@ -21,6 +21,7 @@ import { Smile } from "lucide-react";
 import { useSpeakingDetection } from "@/hooks/useSpeakingDetection";
 
 import ChatBox from "@/components/chat/ChatBox";
+import { useSubtitle } from "@/hooks/useSubtitle";
 
 export default function RoomPage() {
     const params = useParams();
@@ -54,6 +55,16 @@ export default function RoomPage() {
     const [isReactionMenuOpen, setIsReactionMenuOpen] = useState(false);
     const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉', '🔥'];
 
+    const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
+    const subtitleMap = useSubtitle({
+        socket,
+        roomId,
+        micStream,
+        localAudioEnabled,
+        currentUserId: user?.id,
+        enabled: isSubtitleEnabled,
+        language: "en",
+    });
     const roomUrl = typeof window !== "undefined"
         ? `${window.location.origin}/room/${room?.roomId}`
         : "";
@@ -100,7 +111,14 @@ export default function RoomPage() {
         if (!localAudioEnabled) {
             try {
                 if (!audioProducerRef.current) {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: false,
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true,
+                        },
+                    });
                     setMicStream(stream);
                     const audioTrack = stream.getAudioTracks()[0];
                     const producer = await produceMedia(audioTrack);
@@ -307,6 +325,7 @@ export default function RoomPage() {
                     stream={stream}
                     isLocal={false}
                     isSpeaking={speakingUsers.has(p.userId)}
+                    subtitle={subtitleMap.get(p.userId)}
                 />
             );
         }),
@@ -513,6 +532,17 @@ export default function RoomPage() {
                         ))}
                     </div>
                 </div>
+
+                <button
+                    onClick={() => setIsSubtitleEnabled(prev => !prev)}
+                    className={`group relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-full transition-all ${isSubtitleEnabled ? "bg-violet-600 hover:bg-violet-500" : "bg-white/10 hover:bg-white/20"}`}
+                >
+                    <Captions className="h-5 w-5" />
+                    <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
+                        {isSubtitleEnabled ? "Tắt phụ đề" : "Bật phụ đề"}
+                    </span>
+                </button>
+
 
                 <button
                     onClick={handleLeaveRoom}

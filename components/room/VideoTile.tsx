@@ -4,7 +4,7 @@ import { VideoOff } from "lucide-react";
 import { VideoTileProps } from "@/types/room";
 import React, { useEffect, useRef } from "react";
 
-function VideoTile({ name, avatar, videoEnabled, stream, isLocal, isSpeaking }: VideoTileProps) {
+function VideoTile({ name, avatar, videoEnabled, stream, isLocal, isSpeaking, subtitle }: VideoTileProps) {
     const hasVideo = videoEnabled && stream && stream.getVideoTracks().length > 0;
     const audioRef = useRef<HTMLAudioElement>(null);
     useEffect(() => {
@@ -36,6 +36,14 @@ function VideoTile({ name, avatar, videoEnabled, stream, isLocal, isSpeaking }: 
                             {(name ?? "U").charAt(0).toUpperCase()}
                         </div>
                     )}
+                </div>
+            )}
+
+            {subtitle && (
+                <div className="absolute bottom-14 left-1/2 -translate-x-1/2 z-20 max-w-[90%]">
+                    <span className="block rounded-lg bg-black/75 px-4 py-2 text-center text-sm text-white backdrop-blur-sm">
+                        {subtitle}
+                    </span>
                 </div>
             )}
 
