@@ -3,6 +3,7 @@ import Header from "@/components/common/Header";
 import { useAuth } from "@/hooks/useAuth";
 import { roomService } from "@/services/room.service";
 import { useRouter } from "next/navigation";
+import { useSubtitle } from "@/hooks/useSubtitle";
 
 export default function Home() {
   const { loading } = useAuth();
