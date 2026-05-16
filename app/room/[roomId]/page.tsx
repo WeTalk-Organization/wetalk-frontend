@@ -13,6 +13,7 @@ import { Toaster } from "react-hot-toast";
 import { useRoomParticipants } from "@/hooks/useRoomParticipants";
 import RoomEndedModal from "@/components/room/RoomEndedModal";
 import KickedModal from "@/components/room/KickedModal";
+import DuplicateSessionModal from "@/components/room/DuplicateSessionModal";
 import ConfirmKickModal from "@/components/room/ConfirmKickModal";
 import ParticipantList from "@/components/room/ParticipantList";
 import * as mediasoupClient from 'mediasoup-client';
@@ -22,6 +23,8 @@ import { useSpeakingDetection } from "@/hooks/useSpeakingDetection";
 
 import ChatBox from "@/components/chat/ChatBox";
 import { useSubtitle } from "@/hooks/useSubtitle";
+import Image from "next/image";
+import logo from "@/assets/wetalk_logo.png";
 
 export default function RoomPage() {
     const params = useParams();
@@ -29,10 +32,10 @@ export default function RoomPage() {
     const roomId = params.roomId as string;
     const [room, setRoom] = useState<RoomResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
     const [isLeaving, setIsLeaving] = useState(false);
     const [isRoomEnded, setIsRoomEnded] = useState(false);
     const [isKicked, setIsKicked] = useState(false);
+    const [isDuplicateKicked, setIsDuplicateKicked] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isParticipantOpen, setIsParticipantOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -65,9 +68,6 @@ export default function RoomPage() {
         enabled: isSubtitleEnabled,
         language: "en",
     });
-    const roomUrl = typeof window !== "undefined"
-        ? `${window.location.origin}/room/${room?.roomId}`
-        : "";
 
     const { participants } = useRoomParticipants(socket, room?.participants);
     const speakingUsers = useSpeakingDetection({
@@ -88,7 +88,7 @@ export default function RoomPage() {
                 setLocalVideoEnabled(true);
             }
             catch (error) {
-                console.error("Lỗi khi bật camera:", error);
+                console.error("Error enabling camera:", error);
             }
         }
         else {
@@ -137,7 +137,7 @@ export default function RoomPage() {
                 setLocalAudioEnabled(true);
 
             } catch (error) {
-                console.error("Lỗi khi bật mic:", error);
+                console.error("Error enabling mic:", error);
             }
         } else {
             if (audioProducerRef.current) {
@@ -153,20 +153,15 @@ export default function RoomPage() {
         }
     }
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(roomUrl);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
     const handleLeaveRoom = async () => {
         try {
             setIsLeaving(true);
             localStream?.getTracks().forEach(t => t.stop());
             micStream?.getTracks().forEach(t => t.stop());
+            socket?.emit('leave-room', { roomId });
             await roomService.leave(roomId);
         } catch (error) {
-            console.error("Lỗi khi rời phòng:", error);
+            console.error("Error leaving room:", error);
         } finally {
             setIsLeaving(false);
             router.push("/");
@@ -207,8 +202,8 @@ export default function RoomPage() {
             setKickStatus('success');
         } catch (error) {
             const err = error as { response?: { data?: { message?: string } } };
-            console.error("Lỗi khi đuổi người dùng:", error);
-            setKickError(err.response?.data?.message || 'Không thể mời người dùng này ra khỏi phòng');
+            console.error("Error kicking user:", error);
+            setKickError(err.response?.data?.message || 'Cannot kick this user out of the room');
             setKickStatus('error');
         }
     };
@@ -216,6 +211,24 @@ export default function RoomPage() {
     const handleCloseKickModal = () => {
         setKickTarget(null);
     };
+
+    const socketRef = useRef(socket);
+    const localStreamRef = useRef(localStream);
+    const micStreamRef = useRef(micStream);
+    
+    useEffect(() => { socketRef.current = socket; }, [socket]);
+    useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
+    useEffect(() => { micStreamRef.current = micStream; }, [micStream]);
+
+    useEffect(() => {
+        return () => {
+            localStreamRef.current?.getTracks().forEach(t => t.stop());
+            micStreamRef.current?.getTracks().forEach(t => t.stop());
+            if (socketRef.current) {
+                socketRef.current.emit('leave-room', { roomId });
+            }
+        };
+    }, [roomId]);
 
     useEffect(() => {
         if (!roomId) return;
@@ -226,8 +239,8 @@ export default function RoomPage() {
                 setRoom(res.data);
             })
             .catch((err) => {
-                console.error("Lỗi khi tham gia phòng:", err);
-                setError("Phòng học không tồn tại, đã kết thúc hoặc bạn không có quyền.");
+                console.error("Error joining room:", err);
+                setError("The room does not exist, has ended, or you do not have permission.");
             });
     }, [roomId]);
 
@@ -270,9 +283,16 @@ export default function RoomPage() {
             setIsKicked(true);
         });
 
+        socket.on('duplicate-login-kicked', () => {
+            localStream?.getTracks().forEach(t => t.stop());
+            micStream?.getTracks().forEach(t => t.stop());
+            setIsDuplicateKicked(true);
+        });
+
         return () => {
             socket.off('room-ended');
             socket.off('you-were-kicked');
+            socket.off('duplicate-login-kicked');
         };
     }, [socket, localStream, micStream, router]);
 
@@ -284,7 +304,7 @@ export default function RoomPage() {
                     onClick={() => router.push("/")}
                     className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold cursor-pointer hover:bg-violet-500"
                 >
-                    Về trang chủ
+                    Back to home
                 </button>
             </div>
         );
@@ -293,7 +313,7 @@ export default function RoomPage() {
     if (!room) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#0a0a1a] text-white">
-                <p>Đang tải phòng học...</p>
+                <p>Loading room...</p>
             </div>
         );
     }
@@ -304,7 +324,7 @@ export default function RoomPage() {
     const allTiles = [
         <VideoTile
             key="local-user"
-            name={"Bạn"}
+            name={"You"}
             avatar={user?.avatar}
             videoEnabled={localVideoEnabled}
             stream={localStream}
@@ -339,11 +359,14 @@ export default function RoomPage() {
 
     return (
         <div className="flex h-screen flex-col bg-[#0a0a1a] text-white overflow-hidden">
-            {isRoomEnded && !isKicked && (
+            {isRoomEnded && !isKicked && !isDuplicateKicked && (
                 <RoomEndedModal onGoHome={() => router.push('/')} />
             )}
             {isKicked && (
                 <KickedModal onGoHome={() => router.push('/')} />
+            )}
+            {isDuplicateKicked && (
+                <DuplicateSessionModal onGoHome={() => router.push('/')} />
             )}
             {kickTarget && (
                 <ConfirmKickModal
@@ -355,19 +378,11 @@ export default function RoomPage() {
                 />
             )}
             <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-lg font-bold">WeTalk</h1>
-                    <div className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5">
-                        <span className="text-sm text-zinc-400 max-w-[300px] truncate">
-                            {roomUrl}
-                        </span>
-                        <button
-                            onClick={handleCopy}
-                            className="cursor-pointer text-zinc-400 hover:text-white transition-colors"
-                        >
-                            {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-                        </button>
-                    </div>
+                <div
+                    className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={handleLeaveRoom}
+                >
+                    <Image src={logo} alt="WeTalk Logo" height={48} className="h-12 w-auto object-contain" />
                 </div>
             </header>
 
@@ -402,7 +417,7 @@ export default function RoomPage() {
                             ) : currentTiles
                         ) : (
                             <div className="flex w-full max-w-3xl aspect-video items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                                <p className="text-zinc-500">Chưa có ai trong phòng</p>
+                                <p className="text-zinc-500">No one is in the room</p>
                             </div>
                         )}
                     </div>
@@ -468,7 +483,7 @@ export default function RoomPage() {
                 >
                     {localAudioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5 text-white" />}
                     <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
-                        {localAudioEnabled ? "Tắt micro" : "Bật micro"}
+                        {localAudioEnabled ? "Mute mic" : "Unmute mic"}
                     </span>
                 </button>
 
@@ -478,7 +493,7 @@ export default function RoomPage() {
                 >
                     {localVideoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5 text-white" />}
                     <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
-                        {localVideoEnabled ? "Tắt camera" : "Bật camera"}
+                        {localVideoEnabled ? "Turn off camera" : "Turn on camera"}
                     </span>
                 </button>
 
@@ -493,7 +508,7 @@ export default function RoomPage() {
                         </span>
                     )}
                     <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
-                        {isChatOpen ? "Đóng chat" : "Mở chat"}
+                        {isChatOpen ? "Close chat" : "Open chat"}
                     </span>
                 </button>
 
@@ -503,7 +518,7 @@ export default function RoomPage() {
                 >
                     <Users className="h-5 w-5 " />
                     <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
-                        {isParticipantOpen ? "Đóng danh sách" : "Mở danh sách"}
+                        {isParticipantOpen ? "Close participants" : "Open participants"}
                     </span>
                 </button>
 
@@ -514,12 +529,12 @@ export default function RoomPage() {
                     >
                         <Smile className="h-5 w-5 text-white" />
 
-                        {/* Tooltip chữ Mở cảm xúc */}
+                        {/* Emoji tooltip */}
                         <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover/emoji:opacity-100 group-hover/emoji:scale-100 whitespace-nowrap pointer-events-none shadow-lg z-50">
-                            Cảm xúc
+                            Reactions
                         </span>
                     </button>
-                    {/* Bảng tuỳ chọn Emoji nổi lên khi ấn vào */}
+                    {/* Emoji selection board */}
                     <div className={`absolute bottom-[130%] left-1/2 -translate-x-1/2 flex gap-2 rounded-2xl bg-[#2B2D36] border border-white/10 p-2 shadow-xl backdrop-blur-md z-50 transition-all duration-200 ${isReactionMenuOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-2 pointer-events-none'}`}>
                         {EMOJIS.map((emoji) => (
                             <button
@@ -539,7 +554,7 @@ export default function RoomPage() {
                 >
                     <Captions className="h-5 w-5" />
                     <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-[#2B2D36]/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
-                        {isSubtitleEnabled ? "Tắt phụ đề" : "Bật phụ đề"}
+                        {isSubtitleEnabled ? "Turn off subtitles" : "Turn on subtitles"}
                     </span>
                 </button>
 
@@ -551,7 +566,7 @@ export default function RoomPage() {
                 >
                     <PhoneOff className={`h-5 w-5 ${isLeaving ? 'animate-pulse opacity-50' : ''}`} />
                     <span className="absolute bottom-[120%] left-1/2 -translate-x-1/2 rounded-md bg-red-600/90 px-3 py-1.5 text-[13px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-red-500/30 shadow-[0_0_15px_rgba(220,38,38,0.3)] backdrop-blur-md z-50">
-                        Rời phòng
+                        Leave room
                     </span>
                 </button>
             </div>

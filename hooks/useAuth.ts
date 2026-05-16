@@ -24,6 +24,9 @@ export function useAuth() {
             setLoading(false);
         };
         checkAuth();
+
+        window.addEventListener("auth-updated", checkAuth);
+        return () => window.removeEventListener("auth-updated", checkAuth);
     }, [router]);
 
     const logout = () => {
