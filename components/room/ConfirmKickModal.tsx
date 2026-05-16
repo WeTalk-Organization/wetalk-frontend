@@ -17,21 +17,21 @@ export default function ConfirmKickModal({ targetName, onConfirm, onCancel, stat
                 {status === 'idle' && (
                     <>
                         <div className="flex flex-col gap-2">
-                            <h2 className="text-xl font-bold text-white">Xác nhận mời ra</h2>
-                            <p className="text-sm text-zinc-400">Bạn có chắc chắn muốn mời <span className="font-semibold text-white">{targetName}</span> ra khỏi phòng học này không?</p>
+                            <h2 className="text-xl font-bold text-white">Confirm Removal</h2>
+                            <p className="text-sm text-zinc-400">Are you sure you want to remove <span className="font-semibold text-white">{targetName}</span> from this room?</p>
                         </div>
                         <div className="flex items-center gap-3 w-full mt-2">
                             <button
                                 onClick={onCancel}
                                 className="flex-1 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-white/20 transition-colors cursor-pointer text-white"
                             >
-                                Hủy
+                                Cancel
                             </button>
                             <button
                                 onClick={onConfirm}
                                 className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold hover:bg-red-500 transition-colors cursor-pointer text-white"
                             >
-                                Đồng ý
+                                Confirm
                             </button>
                         </div>
                     </>
@@ -40,7 +40,7 @@ export default function ConfirmKickModal({ targetName, onConfirm, onCancel, stat
                 {status === 'loading' && (
                     <div className="flex flex-col items-center gap-4 py-4">
                         <Loader2 className="w-10 h-10 text-violet-500 animate-spin" />
-                        <p className="text-sm text-zinc-400">Đang xử lý...</p>
+                        <p className="text-sm text-zinc-400">Processing...</p>
                     </div>
                 )}
 
@@ -48,14 +48,14 @@ export default function ConfirmKickModal({ targetName, onConfirm, onCancel, stat
                     <div className="flex flex-col items-center gap-4 py-2">
                         <CheckCircle className="w-12 h-12 text-green-500" />
                         <div className="flex flex-col gap-1">
-                            <h2 className="text-lg font-bold text-white">Thành công</h2>
-                            <p className="text-sm text-zinc-400">Đã mời {targetName} ra khỏi phòng</p>
+                            <h2 className="text-lg font-bold text-white">Success</h2>
+                            <p className="text-sm text-zinc-400">Removed {targetName} from the room</p>
                         </div>
                         <button
                             onClick={onCancel}
                             className="mt-4 rounded-xl bg-violet-600 px-8 py-2.5 text-sm font-semibold hover:bg-violet-500 transition-colors cursor-pointer text-white"
                         >
-                            Đóng
+                            Close
                         </button>
                     </div>
                 )}
@@ -64,14 +64,14 @@ export default function ConfirmKickModal({ targetName, onConfirm, onCancel, stat
                     <div className="flex flex-col items-center gap-4 py-2">
                         <AlertCircle className="w-12 h-12 text-red-500" />
                         <div className="flex flex-col gap-1">
-                            <h2 className="text-lg font-bold text-white">Có lỗi xảy ra</h2>
-                            <p className="text-sm text-zinc-400">{errorMessage || 'Không thể thực hiện yêu cầu'}</p>
+                            <h2 className="text-lg font-bold text-white">An error occurred</h2>
+                            <p className="text-sm text-zinc-400">{errorMessage || 'Unable to process request'}</p>
                         </div>
                         <button
                             onClick={onCancel}
                             className="mt-4 rounded-xl bg-white/10 px-8 py-2.5 text-sm font-semibold hover:bg-white/20 transition-colors cursor-pointer text-white"
                         >
-                            Trở lại
+                            Go back
                         </button>
                     </div>
                 )}
