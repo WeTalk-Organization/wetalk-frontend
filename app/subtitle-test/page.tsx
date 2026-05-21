@@ -164,7 +164,7 @@ export default function SubtitleTestPage() {
         } else {
             addLog(`🔇 Chunk #${chunk.id} bị lọc (RMS=${rms.toFixed(4)} < ${RMS_THRESHOLD}) | ${stopReason}`);
         }
-    }, [addLog, showSubtitle, language]);
+    }, [addLog, language]);
 
     const stopVAD = useCallback(() => {
         if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }

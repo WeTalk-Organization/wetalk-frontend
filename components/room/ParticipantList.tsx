@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Participant } from '@/types/room';
-import { X, UserX } from 'lucide-react';
+import { X, UserX, Heart } from 'lucide-react';
+import Image from 'next/image';
 
 interface ParticipantListProps {
     participants: Participant[];
@@ -8,10 +9,15 @@ interface ParticipantListProps {
     hostId: string | undefined;
     onClose: () => void;
     onKick?: (userId: string, targetName: string) => void;
+    onViewProfile?: (userId: string) => void;
+    /** Following IDs managed by parent — updated optimistically on follow/unfollow */
+    followingIds?: Set<string>;
 }
 
-const ParticipantList: React.FC<ParticipantListProps> = ({ participants, currentUserId, hostId, onClose, onKick }) => {
+const ParticipantList: React.FC<ParticipantListProps> = ({ participants, currentUserId, hostId, onClose, onKick, onViewProfile, followingIds }) => {
     const isCurrentUserHost = currentUserId === hostId;
+    const safeFollowingIds = followingIds ?? new Set<string>();
+
 
     return (
         <div className="flex flex-col h-full w-[350px] bg-[#1A1D24] rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.4)] overflow-hidden font-sans border border-white/10">
@@ -42,52 +48,67 @@ const ParticipantList: React.FC<ParticipantListProps> = ({ participants, current
                     const firstLetter = displayName.charAt(0).toUpperCase();
 
                     return (
-                        <div key={p.userId} className="flex items-center gap-3 w-full animate-in slide-in-from-bottom-2 duration-300">
-                            {/* Avatar */}
-                            <div className="relative flex-shrink-0">
-                                {p.avatar ? (
-                                    <>
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
+                        <div key={p.userId} className="flex flex-col gap-2 w-full animate-in slide-in-from-bottom-2 duration-300">
+                            <div className="flex items-center gap-3 w-full">
+                                {/* Avatar */}
+                                <div
+                                    className={`relative flex-shrink-0 rounded-full transition-all 
+                                        ${!isMine && onViewProfile ? 'cursor-pointer' : ''}`}
+                                    onClick={!isMine && onViewProfile ? () => onViewProfile(p.userId) : undefined}
+                                >
+                                    {p.avatar ? (
+                                        <Image
                                             src={p.avatar}
                                             alt="avatar"
-                                            className="w-10 h-10 rounded-full object-cover shadow-sm border border-white/10"
+                                            width={40}
+                                            height={40}
+                                            className="w-10 h-10 rounded-full object-cover shadow-sm border border-white/10 hover:border-violet-500 transition-colors"
                                             referrerPolicy="no-referrer"
+                                            unoptimized
                                         />
-                                    </>
-                                ) : (
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00C6FF] to-[#0072FF] flex items-center justify-center text-white text-[14px] font-bold shadow-sm border border-white/10">
-                                        {firstLetter}
-                                    </div>
-                                )}
+                                    ) : (
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00C6FF] to-[#0072FF] flex items-center justify-center text-white text-[14px] font-bold shadow-sm border border-white/10 hover:border-violet-500 transition-colors">
+                                            {firstLetter}
+                                        </div>
+                                    )}
+                                </div>
 
-                            </div>
-
-                            {/* Name & badges */}
-                            <div className="flex flex-col flex-1 min-w-0">
-                                <span className="text-[14px] text-[#E2E4EB] truncate font-medium flex items-center gap-1.5">
-                                    {displayName}
-                                    {isMine && <span className="text-[#9496A1] text-[12px] font-normal">(You)</span>}
-                                </span>
-                                {isHost && (
-                                    <span className="text-[11px] font-semibold text-amber-400/90 tracking-wide">
-                                        Host
-                                    </span>
-                                )}
-                            </div>
-
-                            {isCurrentUserHost && !isMine && !isHost && onKick && (
-                                <button
-                                    onClick={() => onKick(p.userId, displayName)}
-                                    className="p-1.5 ml-auto text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors group relative"
-                                    title={`Kick ${displayName}`}
+                                {/* Name & badges */}
+                                <div
+                                    className={`flex flex-col flex-1 min-w-0 transition-opacity ${!isMine && onViewProfile ? 'cursor-pointer hover:opacity-80' : ''}`}
+                                    onClick={!isMine && onViewProfile ? () => onViewProfile(p.userId) : undefined}
                                 >
-                                    <UserX className="w-4 h-4" />
-                                    <span className="absolute bottom-[120%] right-0 rounded-md bg-[#2B2D36]/90 px-2 py-1 text-[11px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
-                                        Remove from room
+                                    <span className="text-[14px] text-[#E2E4EB] truncate font-medium flex items-center gap-1.5">
+                                        {displayName}
+                                        {isMine && <span className="text-[#9496A1] text-[12px] font-normal flex-shrink-0">(You)</span>}
                                     </span>
-                                </button>
-                            )}
+                                    {isHost && (
+                                        <span className="text-[11px] font-semibold text-amber-400/90 tracking-wide">
+                                            Host
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-2 ml-auto">
+                                    {safeFollowingIds.has(p.userId) && (
+                                        <Heart className="w-4 h-4 text-red-500 fill-current flex-shrink-0" />
+                                    )}
+                                    {isCurrentUserHost && !isMine && !isHost && onKick && (
+                                        <button
+                                            onClick={() => onKick(p.userId, displayName)}
+                                            className="p-1.5 cursor-pointer ml-auto text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors group relative"
+                                            title={`Kick ${displayName}`}
+                                        >
+                                            <UserX className="w-4 h-4" />
+                                            <span className="absolute bottom-[120%] right-0 rounded-md bg-[#2B2D36]/90 px-2 py-1 text-[11px] font-medium text-white opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 whitespace-nowrap pointer-events-none border border-white/10 shadow-lg backdrop-blur-md z-50">
+                                                Remove from room
+                                            </span>
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+
                         </div>
                     );
                 })}

@@ -1,5 +1,6 @@
 "use client";
 import { RoomListItem, LANGUAGE_MAP, LEVEL_MAP, TOPIC_MAP } from "@/types/room";
+import Image from 'next/image';
 
 interface RoomCardProps {
     room: RoomListItem;
@@ -56,11 +57,14 @@ export default function RoomCard({ room, currentUserId, onJoin }: RoomCardProps)
                 <div className="flex flex-wrap items-center gap-y-3 pl-3 my-3">
                     {displayParticipants.map((p) =>
                         p.avatar ? (
-                            <img
+                            <Image
                                 key={p.userId}
                                 src={p.avatar}
                                 alt={`${p.firstName} ${p.lastName}`}
+                                width={80}
+                                height={80}
                                 className="shrink-0 aspect-square min-h-[80px] min-w-[80px] -ml-3 h-14 w-14 rounded-full border-2 border-[#0a0a1a] object-cover"
+                                unoptimized
                             />
                         ) : (
                             <div

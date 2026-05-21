@@ -50,22 +50,22 @@ export const LEVEL_MAP: Record<string, { label: string }> = {
 };
 
 export const TOPICS = [
-  { label: "Daily Life", emoji: "☀️" },
-  { label: "Travel", emoji: "✈️" },
-  { label: "Food & Cooking", emoji: "🍜" },
-  { label: "Sports", emoji: "⚽" },
-  { label: "Music", emoji: "🎵" },
-  { label: "Movies & TV", emoji: "🎬" },
-  { label: "Technology", emoji: "💻" },
-  { label: "Science", emoji: "🔬" },
-  { label: "Business", emoji: "💼" },
-  { label: "Education", emoji: "📚" },
-  { label: "Health & Wellness", emoji: "🧘" },
-  { label: "Art & Culture", emoji: "🎨" },
-  { label: "Gaming", emoji: "🎮" },
-  { label: "Fashion", emoji: "👗" },
-  { label: "Books", emoji: "📖" },
-  { label: "Politics & Society", emoji: "🌍" },
+    { label: "Daily Life", emoji: "☀️" },
+    { label: "Travel", emoji: "✈️" },
+    { label: "Food & Cooking", emoji: "🍜" },
+    { label: "Sports", emoji: "⚽" },
+    { label: "Music", emoji: "🎵" },
+    { label: "Movies & TV", emoji: "🎬" },
+    { label: "Technology", emoji: "💻" },
+    { label: "Science", emoji: "🔬" },
+    { label: "Business", emoji: "💼" },
+    { label: "Education", emoji: "📚" },
+    { label: "Health & Wellness", emoji: "🧘" },
+    { label: "Art & Culture", emoji: "🎨" },
+    { label: "Gaming", emoji: "🎮" },
+    { label: "Fashion", emoji: "👗" },
+    { label: "Books", emoji: "📖" },
+    { label: "Politics & Society", emoji: "🌍" },
 ];
 
 export const TOPIC_MAP = TOPICS.reduce((acc, topic) => {
@@ -82,6 +82,8 @@ export interface VideoTileProps {
     isLocal?: boolean;
     isSpeaking?: boolean;
     subtitle?: string;
+    userId?: string;
+    onOpenProfile?: (userId: string) => void;
 }
 
 export interface SocketUserPayload {
