@@ -7,4 +7,10 @@ export const API_ENDPOINTS = {
     ROOM: {
         BASE: "/room",
     },
+    USERS: {
+        BASE: "/users",
+    },
+    NOTIFICATIONS: {
+        BASE: "/notifications",
+    },
 };

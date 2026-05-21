@@ -19,10 +19,17 @@ export function useRoomParticipants(
         if (!socket) return;
 
         const handleUserJoined = ({ user }: UserEventPayload) => {
-            toast.success(
-                `${[user.firstName, user.lastName].filter(Boolean).join(' ') || 'Ai đó'} vừa tham gia phòng!`,
+            toast(
+                `${[user.firstName, user.lastName].filter(Boolean).join(' ') || 'Someone'} joined the room!`,
                 { style: { background: '#22c55e', color: '#fff' } },
             );
+
+            try {
+                const joinSound = new Audio('/sounds/join_room.mp3');
+                joinSound.play().catch(e => console.error('Error playing join sound:', e));
+            } catch (err) {
+                console.error('Audio error:', err);
+            }
 
             setParticipants(prev => {
                 const exists = prev.some(p => p.userId === user.id);
@@ -42,9 +49,16 @@ export function useRoomParticipants(
 
         const handleUserLeft = ({ user }: UserEventPayload) => {
             toast(
-                `${[user.firstName, user.lastName].filter(Boolean).join(' ') || 'Ai đó'} đã rời phòng`,
+                `${[user.firstName, user.lastName].filter(Boolean).join(' ') || 'Someone'} left the room`,
                 { style: { background: '#4b5563', color: '#fff' } },
             );
+
+            try {
+                const leftSound = new Audio('/sounds/left_room.mp3');
+                leftSound.play().catch(e => console.error('Error playing left sound:', e));
+            } catch (err) {
+                console.error('Audio error:', err);
+            }
 
             setParticipants(prev => prev.filter(p => p.userId !== user.id));
         };

@@ -4,8 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { roomService } from "@/services/room.service";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { userService } from "@/services/user.service";
 import type { RoomResponse } from "@/types/room";
-import { MessageSquare, Mic, MicOff, Video, Copy, Check, VideoOff, ChevronLeft, ChevronRight, PhoneOff, Users, Captions } from "lucide-react";
+import { MessageSquare, Mic, MicOff, Video, VideoOff, PhoneOff, Users, Captions } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import VideoTile from "@/components/room/VideoTile";
@@ -16,6 +17,7 @@ import KickedModal from "@/components/room/KickedModal";
 import DuplicateSessionModal from "@/components/room/DuplicateSessionModal";
 import ConfirmKickModal from "@/components/room/ConfirmKickModal";
 import ParticipantList from "@/components/room/ParticipantList";
+import UserProfileModal, { type ProfileCacheEntry } from "@/components/room/UserProfileModal";
 import * as mediasoupClient from 'mediasoup-client';
 import ReactionLayer from "@/components/reaction/ReactionLayer";
 import { Smile } from "lucide-react";
@@ -24,7 +26,7 @@ import { useSpeakingDetection } from "@/hooks/useSpeakingDetection";
 import ChatBox from "@/components/chat/ChatBox";
 import { useSubtitle } from "@/hooks/useSubtitle";
 import Image from "next/image";
-import logo from "@/assets/wetalk_logo.png";
+import logo from "@/assets/images/wetalk_logo.png";
 
 export default function RoomPage() {
     const params = useParams();
@@ -44,7 +46,7 @@ export default function RoomPage() {
     const [kickStatus, setKickStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [kickError, setKickError] = useState<string>('');
 
-    const { socket } = useSocket(roomId);
+    const { socket } = useSocket();
     const { user } = useAuth();
     const { remoteStreams, produceMedia } = useWebRTC(socket, roomId, user ?? undefined);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -54,8 +56,26 @@ export default function RoomPage() {
     const [localVideoEnabled, setLocalVideoEnabled] = useState(false);
     const [localAudioEnabled, setLocalAudioEnabled] = useState(false);
     const [micStream, setMicStream] = useState<MediaStream | null>(null);
-    const [currentPage, setCurrentPage] = useState(1);
+
     const [isReactionMenuOpen, setIsReactionMenuOpen] = useState(false);
+
+    const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+    const profileCacheRef = useRef<Record<string, ProfileCacheEntry>>({});
+
+    // Following IDs — fetched once, updated optimistically on follow/unfollow
+    const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+    const followingFetchedRef = useRef(false);
+
+    useEffect(() => {
+        if (!user?.id || followingFetchedRef.current) return;
+        followingFetchedRef.current = true;
+        userService.getFollowing(user.id)
+            .then(res => {
+                const ids = new Set<string>(res.data.map((u: { id: string }) => u.id));
+                setFollowingIds(ids);
+            })
+            .catch(err => console.error('Failed to fetch following list', err));
+    }, [user?.id]);
     const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉', '🔥'];
 
     const [isSubtitleEnabled, setIsSubtitleEnabled] = useState(false);
@@ -215,7 +235,7 @@ export default function RoomPage() {
     const socketRef = useRef(socket);
     const localStreamRef = useRef(localStream);
     const micStreamRef = useRef(micStream);
-    
+
     useEffect(() => { socketRef.current = socket; }, [socket]);
     useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
     useEffect(() => { micStreamRef.current = micStream; }, [micStream]);
@@ -274,6 +294,14 @@ export default function RoomPage() {
         socket.on('room-ended', () => {
             localStream?.getTracks().forEach(t => t.stop());
             micStream?.getTracks().forEach(t => t.stop());
+            
+            try {
+                const endSound = new Audio('/sounds/end_room.mp3');
+                endSound.play().catch(e => console.error('Error playing end sound:', e));
+            } catch (err) {
+                console.error('Audio error:', err);
+            }
+
             setIsRoomEnded(true);
         });
 
@@ -346,16 +374,18 @@ export default function RoomPage() {
                     isLocal={false}
                     isSpeaking={speakingUsers.has(p.userId)}
                     subtitle={subtitleMap.get(p.userId)}
+                    userId={p.userId}
+                    onOpenProfile={setSelectedProfileId}
                 />
             );
         }),
     ];
 
-    const tilesPerPage = 4;
-    const totalPages = Math.ceil(allTiles.length / tilesPerPage);
-    const validCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
-    const startIndex = (validCurrentPage - 1) * tilesPerPage;
-    const currentTiles = allTiles.slice(startIndex, startIndex + tilesPerPage);
+
+
+    const selectedParticipant = selectedProfileId
+        ? participants.find(p => p.userId === selectedProfileId)
+        : null;
 
     return (
         <div className="flex h-screen flex-col bg-[#0a0a1a] text-white overflow-hidden">
@@ -377,6 +407,28 @@ export default function RoomPage() {
                     onCancel={handleCloseKickModal}
                 />
             )}
+            {selectedProfileId && selectedParticipant && (
+                <UserProfileModal
+                    targetUserId={selectedProfileId}
+                    targetName={`${selectedParticipant.firstName ?? ''} ${selectedParticipant.lastName ?? ''}`.trim()}
+                    targetAvatar={selectedParticipant.avatar}
+                    currentUserId={user?.id}
+                    initialData={profileCacheRef.current[selectedProfileId]}
+                    onDataLoaded={(uid, data) => {
+                        const prev = profileCacheRef.current[uid];
+                        profileCacheRef.current[uid] = data;
+                        if (prev?.isFollowing !== data.isFollowing) {
+                            setFollowingIds(current => {
+                                const next = new Set(current);
+                                if (data.isFollowing) next.add(uid);
+                                else next.delete(uid);
+                                return next;
+                            });
+                        }
+                    }}
+                    onClose={() => setSelectedProfileId(null)}
+                />
+            )}
             <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
                 <div
                     className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
@@ -392,57 +444,25 @@ export default function RoomPage() {
 
             <div className="flex flex-1 min-h-0 items-center justify-center p-6 w-full relative overflow-hidden flex-row">
                 <div className="flex-1 w-full h-full relative group flex items-center justify-center transition-all duration-300">
-                    {totalPages > 1 && (
-                        <button
-                            onClick={() => setCurrentPage(validCurrentPage - 1)}
-                            disabled={validCurrentPage === 1}
-                            className="absolute left-6 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-all hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10 opacity-0 group-hover:opacity-100"
-                        >
-                            <ChevronLeft className="h-6 w-6" />
-                        </button>
-                    )}
-
                     <div
-                        className={`w-[85%] max-w-[1600px] mx-auto h-full min-h-[75vh] gap-4 ${currentTiles.length === 1 ? 'flex items-center justify-center' : 'grid px-10'}`}
-                        style={currentTiles.length === 1 ? {} : {
-                            gridTemplateColumns: `repeat(${Math.ceil(Math.sqrt(currentTiles.length || 1))}, minmax(0, 1fr))`,
-                            gridTemplateRows: `repeat(${Math.ceil(currentTiles.length / Math.ceil(Math.sqrt(currentTiles.length || 1)))}, minmax(0, 1fr))`,
+                        className={`w-[85%] max-w-[1600px] mx-auto h-full min-h-[75vh] gap-4 ${allTiles.length === 1 ? 'flex items-center justify-center' : 'grid px-10'}`}
+                        style={allTiles.length === 1 ? {} : {
+                            gridTemplateColumns: `repeat(${Math.ceil(Math.sqrt(allTiles.length || 1))}, minmax(0, 1fr))`,
+                            gridTemplateRows: `repeat(${Math.ceil(allTiles.length / Math.ceil(Math.sqrt(allTiles.length || 1)))}, minmax(0, 1fr))`,
                         }}
                     >
-                        {currentTiles.length > 0 ? (
-                            currentTiles.length === 1 ? (
+                        {allTiles.length > 0 ? (
+                            allTiles.length === 1 ? (
                                 <div className="aspect-video w-full max-w-5xl max-h-full relative">
-                                    {currentTiles[0]}
+                                    {allTiles[0]}
                                 </div>
-                            ) : currentTiles
+                            ) : allTiles
                         ) : (
                             <div className="flex w-full max-w-3xl aspect-video items-center justify-center rounded-2xl border border-white/10 bg-white/5">
                                 <p className="text-zinc-500">No one is in the room</p>
                             </div>
                         )}
                     </div>
-
-                    {totalPages > 1 && (
-                        <button
-                            onClick={() => setCurrentPage(validCurrentPage + 1)}
-                            disabled={validCurrentPage === totalPages}
-                            className="absolute right-6 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-all hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10 opacity-0 group-hover:opacity-100"
-                        >
-                            <ChevronRight className="h-6 w-6" />
-                        </button>
-                    )}
-
-                    {totalPages > 1 && (
-                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {Array.from({ length: totalPages }).map((_, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => setCurrentPage(i + 1)}
-                                    className={`h-2 rounded-full transition-all ${validCurrentPage === i + 1 ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/80"}`}
-                                />
-                            ))}
-                        </div>
-                    )}
                 </div>
 
 
@@ -468,6 +488,8 @@ export default function RoomPage() {
                                     hostId={room?.hostId}
                                     onClose={() => setIsParticipantOpen(false)}
                                     onKick={initKickParticipant}
+                                    onViewProfile={setSelectedProfileId}
+                                    followingIds={followingIds}
                                 />
                             )}
                         </div>
