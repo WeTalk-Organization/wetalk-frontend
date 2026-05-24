@@ -40,6 +40,7 @@ export function useRoomParticipants(
                     firstName: user.firstName ?? '',
                     lastName: user.lastName ?? '',
                     avatar: user.avatar,
+                    bio: user.bio,
                     videoEnabled: false,
                     audioEnabled: false,
                 };

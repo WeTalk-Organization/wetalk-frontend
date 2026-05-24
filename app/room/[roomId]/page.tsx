@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { roomService } from "@/services/room.service";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { userService } from "@/services/user.service";
+import { followService } from "@/services/follow.service";
 import type { RoomResponse } from "@/types/room";
 import { MessageSquare, Mic, MicOff, Video, VideoOff, PhoneOff, Users, Captions } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
@@ -69,10 +69,9 @@ export default function RoomPage() {
     useEffect(() => {
         if (!user?.id || followingFetchedRef.current) return;
         followingFetchedRef.current = true;
-        userService.getFollowing(user.id)
+        followService.getFollowingIds()
             .then(res => {
-                const ids = new Set<string>(res.data.map((u: { id: string }) => u.id));
-                setFollowingIds(ids);
+                setFollowingIds(new Set<string>(res.data));
             })
             .catch(err => console.error('Failed to fetch following list', err));
     }, [user?.id]);
@@ -412,6 +411,7 @@ export default function RoomPage() {
                     targetUserId={selectedProfileId}
                     targetName={`${selectedParticipant.firstName ?? ''} ${selectedParticipant.lastName ?? ''}`.trim()}
                     targetAvatar={selectedParticipant.avatar}
+                    targetBio={selectedParticipant.bio}
                     currentUserId={user?.id}
                     initialData={profileCacheRef.current[selectedProfileId]}
                     onDataLoaded={(uid, data) => {

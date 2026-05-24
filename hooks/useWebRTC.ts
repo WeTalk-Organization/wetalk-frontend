@@ -267,6 +267,7 @@ export function useWebRTC(socket: Socket | null, roomId: string, user?: User) {
                             firstName: user.firstName,
                             lastName: user.lastName,
                             avatar: user.avatar,
+                            bio: user.bio,
                         },
                     },
                     async (response: { joined: boolean; existingProducers: ExistingProducer[] }) => {

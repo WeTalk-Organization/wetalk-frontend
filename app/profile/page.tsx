@@ -1,29 +1,26 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "@/components/common/Header";
 import { useAuth } from "@/hooks/useAuth";
-import toast, { Toaster } from "react-hot-toast";
+import { Toaster } from "react-hot-toast";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { authService } from "@/services/auth.service";
+import { followService, UserStats } from "@/services/follow.service";
+import FollowListModal from "@/components/profile/FollowListModal";
+import EditProfileModal from "@/components/profile/EditProfileModal";
 
 export default function ProfilePage() {
   const { user, loading } = useAuth();
-  const router = useRouter();
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [stats, setStats] = useState<UserStats>({ followerCount: 0, followingCount: 0 });
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [followModalOpen, setFollowModalOpen] = useState(false);
+  const [followModalType, setFollowModalType] = useState<"followers" | "following">("followers");
 
   useEffect(() => {
     if (user) {
-      setFirstName(user.firstName || "");
-      setLastName(user.lastName || "");
-      setAvatarPreview(user.avatar || null);
+      followService.getStats(user.id).then((res) => {
+        if (res.data) setStats(res.data);
+      }).catch(err => console.error("Failed to fetch stats", err));
     }
   }, [user]);
 
@@ -31,174 +28,108 @@ export default function ProfilePage() {
     return <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center text-white">Loading...</div>;
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
+  if (!user) {
+    return <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center text-white">Not logged in</div>;
+  }
 
-      if (!file.type.startsWith("image/")) {
-        toast.error("Vui lòng chọn file hình ảnh hợp lệ.");
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Kích thước ảnh tối đa là 5MB.");
-        return;
-      }
+  const initial = user.firstName?.charAt(0).toUpperCase() || "?";
 
-      setAvatarFile(file);
-      setAvatarPreview(URL.createObjectURL(file));
-    }
+  const openFollowModal = (type: "followers" | "following") => {
+    setFollowModalType(type);
+    setFollowModalOpen(true);
   };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const trimmedFirstName = firstName.trim();
-    const trimmedLastName = lastName.trim();
-
-    if (trimmedFirstName.length < 2 || trimmedFirstName.length > 30) {
-      toast.error("First name must be between 2 and 30 characters.");
-      return;
-    }
-    if (trimmedLastName.length < 2 || trimmedLastName.length > 30) {
-      toast.error("Last name must be between 2 and 30 characters.");
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-      const formData = new FormData();
-      formData.append("firstName", trimmedFirstName);
-      formData.append("lastName", trimmedLastName);
-      if (avatarFile) {
-        formData.append("avatar", avatarFile);
-      }
-
-      const response = await authService.updateProfile(formData);
-
-      // Update token in localStorage
-      if (response.data.accessToken) {
-        localStorage.setItem("accessToken", response.data.accessToken);
-        window.dispatchEvent(new Event("auth-updated"));
-      }
-
-      toast.success("Profile updated successfully!");
-
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || "Failed to update profile.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const initial = user?.firstName?.charAt(0).toUpperCase() || "?";
 
   return (
     <div className="min-h-screen bg-[#0a0a1a] text-white">
       <Toaster position="bottom-left" />
       <Header />
-      <div className="max-w-2xl mx-auto mt-10 p-6 bg-white/5 rounded-2xl border border-white/10 shadow-lg">
-        <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-violet-400">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-          </svg>
-          Edit Profile
-        </h1>
-        <form onSubmit={handleSave} className="space-y-8">
-          <div className="flex flex-col items-center sm:flex-row sm:items-start gap-8">
-            <div className="flex flex-col items-center gap-3">
-              <div
-                className="relative group cursor-pointer w-28 h-28 rounded-full overflow-hidden bg-gray-700 border-2 border-dashed border-gray-500 hover:border-violet-500 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {avatarPreview ? (
-                  <Image
-                    src={avatarPreview}
-                    alt="Avatar Preview"
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl font-semibold">
-                    {initial}
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-white">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
-                  </svg>
+
+      <div className="max-w-3xl mx-auto mt-10 p-4 sm:p-6">
+        <div className="relative bg-[#151525] rounded-3xl border border-white/10 shadow-xl p-6 sm:p-8">
+
+          {/* Edit Button (Top Right) */}
+          <button
+            onClick={() => setIsEditModalOpen(true)}
+            className="cursor-pointer group absolute top-4 right-4 sm:top-6 sm:right-6 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+            </svg>
+            {/* Tooltip */}
+            <span className="absolute -top-10 right-0 bg-gray-800 text-xs text-white px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg border border-white/10">
+              Edit Profile
+            </span>
+          </button>
+
+          {/* Profile Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center mb-6 gap-4 sm:gap-6">
+            {/* Avatar */}
+            <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden border-4 border-[#151525] bg-gray-700 shadow-xl flex-shrink-0 relative mx-auto sm:mx-0">
+              {user.avatar ? (
+                <Image src={user.avatar} alt="User Avatar" fill className="object-cover" unoptimized />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-4xl text-gray-400 font-bold">
+                  {initial}
+                </div>
+              )}
+            </div>
+
+            {/* Name & Follow Stats */}
+            <div className="flex flex-col items-center sm:items-start">
+              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 text-center sm:text-left">
+                {user.firstName} {user.lastName}
+              </h1>
+              <p className="text-gray-400 text-sm mb-4">{user.email}</p>
+              
+              {user.bio && (
+                <p className="text-gray-300 text-sm mb-5 max-w-md text-center sm:text-left break-words whitespace-pre-wrap">
+                  {user.bio}
+                </p>
+              )}
+
+              <div className="flex gap-4 items-center">
+                <div
+                  className="flex flex-row items-center gap-1.5 cursor-pointer group"
+                  onClick={() => openFollowModal("following")}
+                >
+                  <span className="text-base font-bold text-white group-hover:text-violet-400 transition-colors">
+                    {stats.followingCount}
+                  </span>
+                  <span className="text-sm text-gray-400 group-hover:text-gray-300 font-medium">Following</span>
+                </div>
+                <div className="w-px h-4 bg-white/10"></div>
+
+                <div
+                  className="flex flex-row items-center gap-1.5 cursor-pointer group"
+                  onClick={() => openFollowModal("followers")}
+                >
+                  <span className="text-base font-bold text-white group-hover:text-violet-400 transition-colors">
+                    {stats.followerCount}
+                  </span>
+                  <span className="text-sm text-gray-400 group-hover:text-gray-300 font-medium">Followers</span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-sm text-gray-400 hover:text-white transition-colors"
-              >
-                Change Avatar
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/jpeg, image/png, image/webp"
-                onChange={handleFileChange}
-              />
-            </div>
-
-            <div className="flex-1 space-y-4 w-full">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-300">Email</label>
-                <input
-                  type="email"
-                  value={user?.email || ""}
-                  disabled
-                  className="bg-white/5 border border-transparent rounded-lg px-4 py-2.5 text-gray-500 cursor-not-allowed focus:outline-none"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-300">First Name</label>
-                <input
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="bg-black/50 border border-white/10 rounded-lg px-4 py-2.5 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all"
-                  placeholder="Enter your first name"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-300">Last Name</label>
-                <input
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="bg-black/50 border border-white/10 rounded-lg px-4 py-2.5 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all"
-                  placeholder="Enter your last name"
-                />
-              </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-6 border-t border-white/10">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="cursor-pointer px-6 py-2 rounded-lg font-medium text-gray-300 hover:bg-white/5 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className={`cursor-pointer px-6 py-2 rounded-lg font-semibold text-white transition-all active:scale-95 ${isSaving ? "bg-violet-600/50 cursor-not-allowed" : "bg-violet-600 hover:bg-violet-500"
-                }`}
-            >
-              {isSaving ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
+
+      <EditProfileModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        user={user}
+      />
+
+      <FollowListModal
+        isOpen={followModalOpen}
+        onClose={() => setFollowModalOpen(false)}
+        userId={user.id}
+        type={followModalType}
+        onUnfollow={() =>
+          setStats((prev) => ({ ...prev, followingCount: Math.max(0, prev.followingCount - 1) }))
+        }
+      />
     </div>
   );
 }

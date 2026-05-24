@@ -25,7 +25,12 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
                 try {
                     const user = decodeToken(token);
                     if (user?.id) {
-                        socketInstance.emit("identify", { id: user.id });
+                        socketInstance.emit("identify", {
+                            id: user.id,
+                            firstName: user.firstName,
+                            lastName: user.lastName,
+                            avatar: user.avatar,
+                        });
                     }
                 } catch (e) {
                     console.error("Invalid token in socket context", e);

@@ -5,6 +5,7 @@ export interface Participant {
     avatar?: string;
     videoEnabled: boolean;
     audioEnabled: boolean;
+    bio?: string;
     joinedAt?: string;
 }
 
@@ -91,6 +92,7 @@ export interface SocketUserPayload {
     firstName?: string;
     lastName?: string;
     avatar?: string;
+    bio?: string;
 }
 export interface UserEventPayload {
     socketId: string;
