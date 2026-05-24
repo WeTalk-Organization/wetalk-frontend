@@ -28,6 +28,7 @@ export function decodeToken(token: string): User | null {
             firstName: payload.firstName,
             lastName: payload.lastName,
             avatar: payload.avatar,
+            bio: payload.bio,
         };
     } catch {
         return null;

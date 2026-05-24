@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { X, UserPlus, UserMinus, Loader2, Users } from "lucide-react";
-import { userService } from "@/services/user.service";
+import { followService } from "@/services/follow.service";
 
 export interface ProfileCacheEntry {
     followerCount: number;
@@ -15,6 +15,7 @@ interface UserProfileModalProps {
     targetUserId: string;
     targetName: string;
     targetAvatar?: string;
+    targetBio?: string;
     currentUserId: string | undefined;
     onClose: () => void;
     /** Pre-fetched data from parent cache — skips API calls when present */
@@ -32,6 +33,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     targetUserId,
     targetName,
     targetAvatar,
+    targetBio,
     currentUserId,
     onClose,
     initialData,
@@ -68,8 +70,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             setLoadingStats(true);
             try {
                 const [statsRes, followRes] = await Promise.all([
-                    userService.getStats(targetUserId),
-                    currentUserId ? userService.isFollowing(targetUserId) : Promise.resolve({ data: false }),
+                    followService.getStats(targetUserId),
+                    currentUserId ? followService.isFollowing(targetUserId) : Promise.resolve({ data: false }),
                 ]);
                 if (isMounted) {
                     setStats(statsRes.data);
@@ -96,7 +98,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         setLoadingFollow(true);
         try {
             if (isFollowing) {
-                await userService.unfollow(targetUserId);
+                await followService.unfollow(targetUserId);
                 const newFollowerCount = (stats?.followerCount ?? 0) - 1;
                 setIsFollowing(false);
                 setStats(prev => prev ? { ...prev, followerCount: newFollowerCount } : prev);
@@ -106,7 +108,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     isFollowing: false,
                 });
             } else {
-                await userService.follow(targetUserId);
+                await followService.follow(targetUserId);
                 const newFollowerCount = (stats?.followerCount ?? 0) + 1;
                 setIsFollowing(true);
                 setStats(prev => prev ? { ...prev, followerCount: newFollowerCount } : prev);
@@ -167,6 +169,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     <h2 className="text-lg font-bold text-white text-center leading-tight">
                         {targetName}
                     </h2>
+
+                    {/* Bio */}
+                    {targetBio && (
+                        <p className="mt-2 text-sm text-zinc-300 text-center px-2 line-clamp-3 break-words whitespace-pre-wrap">
+                            {targetBio}
+                        </p>
+                    )}
 
                     {/* Stats */}
                     <div className="mt-4 w-full flex items-center justify-center gap-8">

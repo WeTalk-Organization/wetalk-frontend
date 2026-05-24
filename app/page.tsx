@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Header from "@/components/common/Header";
+import ActiveFollowingList from "@/components/common/ActiveFollowingList";
 import RoomCard from "@/components/room/RoomCard";
 import CreateRoomModal from "@/components/room/CreateRoomModal";
 import { useAuth } from "@/hooks/useAuth";
@@ -159,8 +160,10 @@ export default function Home() {
         />
       )}
 
-      {/* Room list */}
+      {/* Main Content */}
       <section className="mx-auto max-w-6xl px-4 pb-16">
+        {user && <ActiveFollowingList />}
+
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="flex items-center text-xl font-semibold gap-3">
             <span className="relative flex h-3 w-3 items-center justify-center">

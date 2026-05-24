@@ -10,6 +10,9 @@ export const API_ENDPOINTS = {
     USERS: {
         BASE: "/users",
     },
+    FOLLOWS: {
+        BASE: "/follows",
+    },
     NOTIFICATIONS: {
         BASE: "/notifications",
     },
