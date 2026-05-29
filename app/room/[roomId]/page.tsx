@@ -85,7 +85,7 @@ export default function RoomPage() {
         localAudioEnabled,
         currentUserId: user?.id,
         enabled: isSubtitleEnabled,
-        language: "en",
+        language: room?.language ?? "en",
     });
 
     const { participants } = useRoomParticipants(socket, room?.participants);
@@ -356,6 +356,7 @@ export default function RoomPage() {
             videoEnabled={localVideoEnabled}
             stream={localStream}
             isLocal={true}
+            subtitle={currentUserId ? subtitleMap.get(currentUserId) : undefined}
         />,
 
         ...remoteParticipants.map(p => {
